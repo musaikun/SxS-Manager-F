@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:table_calendar/table_calendar.dart';
 import 'package:intl/intl.dart';
+import '../../shift/presentation/date_selection_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -216,6 +217,36 @@ class _HomeScreenState extends State<HomeScreen> {
             );
           }
         },
+      ),
+
+      // 日付選択ボタン
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () async {
+          // 日付選択画面へ遷移
+          final selectedDates = await Navigator.push<List<DateTime>>(
+            context,
+            MaterialPageRoute(
+              builder: (context) => const DateSelectionScreen(),
+            ),
+          );
+
+          if (selectedDates != null && selectedDates.isNotEmpty) {
+            // 選択された日付を表示
+            if (context.mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('${selectedDates.length}日を選択しました'),
+                  action: SnackBarAction(
+                    label: '詳細',
+                    onPressed: () {},
+                  ),
+                ),
+              );
+            }
+          }
+        },
+        icon: const Icon(Icons.calendar_month),
+        label: const Text('複数日選択'),
       ),
     );
   }
