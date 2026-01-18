@@ -70,9 +70,11 @@ class CalendarNotifier extends StateNotifier<CalendarState> {
       }
       state = state.copyWith(selectedDates: newSelected);
     } else {
-      // ジョブモード
-      final newDateJobMap = Map<String, Set<int>>.from(state.dateJobMap);
-      newDateJobMap.putIfAbsent(dateString, () => {});
+      // ジョブモード - ディープコピー
+      final newDateJobMap = state.dateJobMap.map(
+        (key, value) => MapEntry(key, Set<int>.from(value)),
+      );
+      newDateJobMap.putIfAbsent(dateString, () => <int>{});
 
       if (newDateJobMap[dateString]!.contains(state.currentJobId)) {
         newDateJobMap[dateString]!.remove(state.currentJobId);
