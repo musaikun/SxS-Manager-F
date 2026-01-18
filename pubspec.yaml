@@ -9,6 +9,9 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  flutter_localizations:
+    sdk: flutter
+
 
   # 状態管理
   flutter_riverpod: ^2.4.0
