@@ -4,60 +4,31 @@ publish_to: 'none'
 version: 1.0.0+1
 
 environment:
-  sdk: '>=3.2.0 <4.0.0'
+  sdk: ^3.10.0
 
 dependencies:
   flutter:
     sdk: flutter
   flutter_localizations:
     sdk: flutter
+  intl: ^0.20.2
 
-
-  # 状態管理
   flutter_riverpod: ^2.4.0
   riverpod_annotation: ^2.3.0
 
-  # ルーティング
   go_router: ^13.0.0
-
-  # バックエンド連携
   supabase_flutter: ^2.0.0
 
-  # ローカルDB
   isar: ^3.1.0
   isar_flutter_libs: ^3.1.0
   shared_preferences: ^2.2.0
 
-  # UI/UX
   table_calendar: ^3.0.9
   flutter_colorpicker: ^1.0.3
-  intl: ^0.19.0
-
-  # PDF生成
-  pdf: ^3.10.0
-  printing: ^5.11.0
-
-  # 共有機能
-  share_plus: ^7.2.0
-
-  # その他
-  freezed_annotation: ^2.4.1
-  json_annotation: ^4.8.1
-
-  cupertino_icons: ^1.0.2
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
-
-  # コード生成
-  build_runner: ^2.4.0
-  freezed: ^2.4.1
-  json_serializable: ^6.7.0
-  riverpod_generator: ^2.3.0
-  isar_generator: ^3.1.0
-
-  flutter_lints: ^3.0.0
 
 flutter:
   uses-material-design: true
