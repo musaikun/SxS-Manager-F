@@ -206,7 +206,7 @@ class ShiftListScreen extends ConsumerWidget {
                 context,
                 MaterialPageRoute(
                   builder: (context) =>
-                      TimeSettingScreen(dateString: shiftDate.dateString),
+                      TimeSettingScreen(uniqueKey: shiftDate.uniqueKey),
                 ),
               );
             },
@@ -335,7 +335,7 @@ class ShiftListScreen extends ConsumerWidget {
           ),
           TextButton(
             onPressed: () {
-              ref.read(shiftDateProvider.notifier).removeDate(shiftDate.dateString);
+              ref.read(shiftDateProvider.notifier).removeDate(shiftDate.uniqueKey);
               Navigator.pop(context);
             },
             child: const Text('削除', style: TextStyle(color: Colors.red)),
@@ -439,15 +439,15 @@ class ShiftListScreen extends ConsumerWidget {
                   final endStr =
                       '${endTime!.hour.toString().padLeft(2, '0')}:${endTime!.minute.toString().padLeft(2, '0')}';
 
-                  final dateStrings =
-                      shiftDates.map((d) => d.dateString).toList();
+                  final uniqueKeys =
+                      shiftDates.map((d) => d.uniqueKey).toList();
                   ref
                       .read(shiftDateProvider.notifier)
-                      .updateMultipleTimes(dateStrings, startStr, endStr);
+                      .updateMultipleTimes(uniqueKeys, startStr, endStr);
 
                   Navigator.pop(context);
                   ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('${dateStrings.length}日に時間を設定しました')),
+                    SnackBar(content: Text('${uniqueKeys.length}件に時間を設定しました')),
                   );
                 }
               },

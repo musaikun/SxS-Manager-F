@@ -4,11 +4,11 @@ import 'package:intl/intl.dart';
 import '../providers/shift_date_provider.dart';
 
 class TimeSettingScreen extends ConsumerStatefulWidget {
-  final String dateString;
+  final String uniqueKey;
 
   const TimeSettingScreen({
     super.key,
-    required this.dateString,
+    required this.uniqueKey,
   });
 
   @override
@@ -32,7 +32,7 @@ class _TimeSettingScreenState extends ConsumerState<TimeSettingScreen> {
   void _loadExistingData() {
     final shiftDates = ref.read(shiftDateProvider);
     final shiftDate =
-        shiftDates.firstWhere((d) => d.dateString == widget.dateString);
+        shiftDates.firstWhere((d) => d.uniqueKey == widget.uniqueKey);
 
     if (shiftDate.startTime != null) {
       final parts = shiftDate.startTime!.split(':');
@@ -90,14 +90,14 @@ class _TimeSettingScreenState extends ConsumerState<TimeSettingScreen> {
 
     // Providerに保存
     ref.read(shiftDateProvider.notifier).updateTime(
-          widget.dateString,
+          widget.uniqueKey,
           _timeToString(_startTime!),
           _timeToString(_endTime!),
         );
 
     if (_memoController.text.isNotEmpty) {
       ref.read(shiftDateProvider.notifier).updateMemo(
-            widget.dateString,
+            widget.uniqueKey,
             _memoController.text,
           );
     }
@@ -128,7 +128,9 @@ class _TimeSettingScreenState extends ConsumerState<TimeSettingScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final date = DateTime.parse(widget.dateString);
+    // uniqueKeyから日付を抽出（形式: "2025-01-15_storeId"）
+    final dateString = widget.uniqueKey.split('_')[0];
+    final date = DateTime.parse(dateString);
     final weekday = DateFormat.E('ja_JP').format(date);
 
     return Scaffold(

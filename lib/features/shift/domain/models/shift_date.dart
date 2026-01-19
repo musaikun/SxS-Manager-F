@@ -1,12 +1,14 @@
 /// シフト日付モデル
 class ShiftDate {
   final DateTime date;
+  final String storeId; // 店舗ID
   final String? startTime; // 例: "10:00"
   final String? endTime; // 例: "18:00"
   final String? memo;
 
   ShiftDate({
     required this.date,
+    required this.storeId,
     this.startTime,
     this.endTime,
     this.memo,
@@ -21,9 +23,13 @@ class ShiftDate {
   /// 時間が設定されているか
   bool get hasTime => startTime != null && endTime != null;
 
+  /// ユニークキー（日付+店舗IDの組み合わせ）
+  String get uniqueKey => '${dateString}_$storeId';
+
   /// コピーメソッド
   ShiftDate copyWith({
     DateTime? date,
+    String? storeId,
     String? startTime,
     String? endTime,
     String? memo,
@@ -33,6 +39,7 @@ class ShiftDate {
   }) {
     return ShiftDate(
       date: date ?? this.date,
+      storeId: storeId ?? this.storeId,
       startTime: clearStartTime ? null : (startTime ?? this.startTime),
       endTime: clearEndTime ? null : (endTime ?? this.endTime),
       memo: clearMemo ? null : (memo ?? this.memo),
@@ -43,6 +50,7 @@ class ShiftDate {
   Map<String, dynamic> toJson() {
     return {
       'date': dateString,
+      'storeId': storeId,
       'startTime': startTime,
       'endTime': endTime,
       'memo': memo,
@@ -52,6 +60,7 @@ class ShiftDate {
   factory ShiftDate.fromJson(Map<String, dynamic> json) {
     return ShiftDate(
       date: DateTime.parse(json['date'] as String),
+      storeId: json['storeId'] as String,
       startTime: json['startTime'] as String?,
       endTime: json['endTime'] as String?,
       memo: json['memo'] as String?,
@@ -63,8 +72,8 @@ class ShiftDate {
       identical(this, other) ||
       other is ShiftDate &&
           runtimeType == other.runtimeType &&
-          dateString == other.dateString;
+          uniqueKey == other.uniqueKey;
 
   @override
-  int get hashCode => dateString.hashCode;
+  int get hashCode => uniqueKey.hashCode;
 }

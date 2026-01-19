@@ -48,13 +48,13 @@ class ShiftDateNotifier extends StateNotifier<List<ShiftDate>> {
 
   // ==================== 日付操作 ====================
 
-  /// 日付を追加
-  void addDate(DateTime date) {
+  /// 日付を追加（店舗指定）
+  void addDate(DateTime date, String storeId) {
     final normalizedDate = DateTime(date.year, date.month, date.day);
-    final shiftDate = ShiftDate(date: normalizedDate);
+    final shiftDate = ShiftDate(date: normalizedDate, storeId: storeId);
 
-    // 既に存在しない場合のみ追加
-    if (!state.any((d) => d.dateString == shiftDate.dateString)) {
+    // 既に存在しない場合のみ追加（同じ日付+店舗IDの組み合わせ）
+    if (!state.any((d) => d.uniqueKey == shiftDate.uniqueKey)) {
       final newList = [...state, shiftDate];
       newList.sort((a, b) => a.date.compareTo(b.date));
       state = newList;
@@ -62,15 +62,15 @@ class ShiftDateNotifier extends StateNotifier<List<ShiftDate>> {
     }
   }
 
-  /// 複数の日付を追加
-  void addDates(List<DateTime> dates) {
+  /// 複数の日付を追加（店舗指定）
+  void addDates(List<DateTime> dates, String storeId) {
     final newDates = <ShiftDate>[];
     for (final date in dates) {
       final normalizedDate = DateTime(date.year, date.month, date.day);
-      final shiftDate = ShiftDate(date: normalizedDate);
+      final shiftDate = ShiftDate(date: normalizedDate, storeId: storeId);
 
       // 既に存在しない場合のみ追加
-      if (!state.any((d) => d.dateString == shiftDate.dateString)) {
+      if (!state.any((d) => d.uniqueKey == shiftDate.uniqueKey)) {
         newDates.add(shiftDate);
       }
     }
@@ -83,9 +83,21 @@ class ShiftDateNotifier extends StateNotifier<List<ShiftDate>> {
     }
   }
 
-  /// 日付を削除
-  void removeDate(String dateString) {
+  /// 日付を削除（uniqueKeyで指定）
+  void removeDate(String uniqueKey) {
+    state = state.where((d) => d.uniqueKey != uniqueKey).toList();
+    _saveToStorage();
+  }
+
+  /// 特定の日付のすべての店舗を削除
+  void removeDateAllStores(String dateString) {
     state = state.where((d) => d.dateString != dateString).toList();
+    _saveToStorage();
+  }
+
+  /// 特定の店舗のすべてのシフトを削除
+  void removeStore(String storeId) {
+    state = state.where((d) => d.storeId != storeId).toList();
     _saveToStorage();
   }
 
@@ -95,10 +107,10 @@ class ShiftDateNotifier extends StateNotifier<List<ShiftDate>> {
     _saveToStorage();
   }
 
-  /// 特定の日付の時間を更新
-  void updateTime(String dateString, String? startTime, String? endTime) {
+  /// 特定の日付の時間を更新（uniqueKeyで指定）
+  void updateTime(String uniqueKey, String? startTime, String? endTime) {
     state = state.map((d) {
-      if (d.dateString == dateString) {
+      if (d.uniqueKey == uniqueKey) {
         return d.copyWith(startTime: startTime, endTime: endTime);
       }
       return d;
@@ -106,14 +118,14 @@ class ShiftDateNotifier extends StateNotifier<List<ShiftDate>> {
     _saveToStorage();
   }
 
-  /// 複数の日付に同じ時間を一括設定
+  /// 複数の日付に同じ時間を一括設定（uniqueKeyリストで指定）
   void updateMultipleTimes(
-    List<String> dateStrings,
+    List<String> uniqueKeys,
     String? startTime,
     String? endTime,
   ) {
     state = state.map((d) {
-      if (dateStrings.contains(d.dateString)) {
+      if (uniqueKeys.contains(d.uniqueKey)) {
         return d.copyWith(startTime: startTime, endTime: endTime);
       }
       return d;
@@ -121,10 +133,10 @@ class ShiftDateNotifier extends StateNotifier<List<ShiftDate>> {
     _saveToStorage();
   }
 
-  /// メモを更新
-  void updateMemo(String dateString, String? memo) {
+  /// メモを更新（uniqueKeyで指定）
+  void updateMemo(String uniqueKey, String? memo) {
     state = state.map((d) {
-      if (d.dateString == dateString) {
+      if (d.uniqueKey == uniqueKey) {
         return d.copyWith(memo: memo);
       }
       return d;
@@ -132,17 +144,33 @@ class ShiftDateNotifier extends StateNotifier<List<ShiftDate>> {
     _saveToStorage();
   }
 
-  /// 日付が選択されているか確認
-  bool isDateSelected(DateTime date) {
+  /// 日付が選択されているか確認（特定の店舗で）
+  bool isDateSelected(DateTime date, String storeId) {
     final dateString = '${date.year.toString().padLeft(4, '0')}-'
         '${date.month.toString().padLeft(2, '0')}-'
         '${date.day.toString().padLeft(2, '0')}';
-    return state.any((d) => d.dateString == dateString);
+    return state.any((d) => d.dateString == dateString && d.storeId == storeId);
   }
 
-  /// 選択されている日付の文字列リストを取得
-  List<String> getSelectedDateStrings() {
-    return state.map((d) => d.dateString).toList();
+  /// 特定の日付のシフト数を取得
+  int getShiftCountForDate(DateTime date) {
+    final dateString = '${date.year.toString().padLeft(4, '0')}-'
+        '${date.month.toString().padLeft(2, '0')}-'
+        '${date.day.toString().padLeft(2, '0')}';
+    return state.where((d) => d.dateString == dateString).length;
+  }
+
+  /// 特定の日付のシフトを取得
+  List<ShiftDate> getShiftsForDate(DateTime date) {
+    final dateString = '${date.year.toString().padLeft(4, '0')}-'
+        '${date.month.toString().padLeft(2, '0')}-'
+        '${date.day.toString().padLeft(2, '0')}';
+    return state.where((d) => d.dateString == dateString).toList();
+  }
+
+  /// 特定の店舗のシフトを取得
+  List<ShiftDate> getShiftsForStore(String storeId) {
+    return state.where((d) => d.storeId == storeId).toList();
   }
 }
 
