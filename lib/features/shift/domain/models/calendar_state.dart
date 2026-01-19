@@ -87,7 +87,7 @@ class CalendarState {
       currentMonth: month,
       selectedDates: Set<String>.from(json['selectedDates'] ?? []),
       dateJobMap: (json['dateJobMap'] as Map<String, dynamic>?)?.map(
-            (key, value) => MapEntry(key, Set<int>.from(value)),
+            (key, value) => MapEntry(key, Set<int>.from(value as List)),
           ) ??
           {},
       jobs: (json['jobs'] as List?)
