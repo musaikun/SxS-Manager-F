@@ -82,14 +82,22 @@ class CalendarState {
     int year,
     int month,
   ) {
+    // dateJobMapを明示的に型変換
+    final Map<String, Set<int>> parsedDateJobMap = {};
+    final rawDateJobMap = json['dateJobMap'] as Map<String, dynamic>?;
+    if (rawDateJobMap != null) {
+      rawDateJobMap.forEach((key, value) {
+        if (value is List) {
+          parsedDateJobMap[key] = Set<int>.from(value);
+        }
+      });
+    }
+
     return CalendarState(
       currentYear: year,
       currentMonth: month,
       selectedDates: Set<String>.from(json['selectedDates'] ?? []),
-      dateJobMap: (json['dateJobMap'] as Map<String, dynamic>?)?.map(
-            (key, value) => MapEntry(key, Set<int>.from(value as List)),
-          ) ??
-          {},
+      dateJobMap: parsedDateJobMap,
       jobs: (json['jobs'] as List?)
               ?.map((j) => Job.fromJson(j as Map<String, dynamic>))
               .toList() ??

@@ -35,6 +35,9 @@ class CalendarNotifier extends StateNotifier<CalendarState> {
       }
     } catch (e) {
       print('Failed to load calendar state: $e');
+      // データが壊れている場合はクリア
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove('calendar_state');
     }
   }
 
@@ -44,6 +47,17 @@ class CalendarNotifier extends StateNotifier<CalendarState> {
       await prefs.setString('calendar_state', jsonEncode(state.toJson()));
     } catch (e) {
       print('Failed to save calendar state: $e');
+    }
+  }
+
+  /// 保存データをクリア（デバッグ用）
+  Future<void> clearStorage() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove('calendar_state');
+      state = _initialState();
+    } catch (e) {
+      print('Failed to clear calendar state: $e');
     }
   }
 
