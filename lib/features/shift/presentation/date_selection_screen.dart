@@ -1,21 +1,25 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:table_calendar/table_calendar.dart';
 import 'package:intl/intl.dart';
+import '../providers/shift_date_provider.dart';
+import 'shift_list_screen.dart';
 
-class DateSelectionScreen extends StatefulWidget {
+class DateSelectionScreen extends ConsumerStatefulWidget {
   const DateSelectionScreen({super.key});
 
   @override
-  State<DateSelectionScreen> createState() => _DateSelectionScreenState();
+  ConsumerState<DateSelectionScreen> createState() =>
+      _DateSelectionScreenState();
 }
 
-class _DateSelectionScreenState extends State<DateSelectionScreen> {
+class _DateSelectionScreenState extends ConsumerState<DateSelectionScreen> {
   // カレンダーの状態
   DateTime _focusedDay = DateTime.now();
   CalendarFormat _calendarFormat = CalendarFormat.month;
 
-  // 選択された日付のセット
-  final Set<DateTime> _selectedDates = {};
+  // 一時的な選択（確定前）
+  final Set<DateTime> _tempSelectedDates = {};
 
   // 2025年の祝日リスト（日本）
   final Map<DateTime, String> _holidays = {
@@ -45,7 +49,7 @@ class _DateSelectionScreenState extends State<DateSelectionScreen> {
   // 日付が選択されているか確認
   bool _isSelected(DateTime day) {
     final normalized = _normalizeDate(day);
-    return _selectedDates.contains(normalized);
+    return _tempSelectedDates.contains(normalized);
   }
 
   // 日付が祝日か確認
@@ -70,10 +74,10 @@ class _DateSelectionScreenState extends State<DateSelectionScreen> {
   void _toggleDate(DateTime day) {
     setState(() {
       final normalized = _normalizeDate(day);
-      if (_selectedDates.contains(normalized)) {
-        _selectedDates.remove(normalized);
+      if (_tempSelectedDates.contains(normalized)) {
+        _tempSelectedDates.remove(normalized);
       } else {
-        _selectedDates.add(normalized);
+        _tempSelectedDates.add(normalized);
       }
     });
   }
@@ -87,7 +91,7 @@ class _DateSelectionScreenState extends State<DateSelectionScreen> {
       for (int i = 0; i <= lastDay.day - 1; i++) {
         final day = firstDay.add(Duration(days: i));
         if (_isWeekday(day)) {
-          _selectedDates.add(_normalizeDate(day));
+          _tempSelectedDates.add(_normalizeDate(day));
         }
       }
     });
@@ -101,7 +105,7 @@ class _DateSelectionScreenState extends State<DateSelectionScreen> {
 
       for (int i = 0; i <= lastDay.day - 1; i++) {
         final day = firstDay.add(Duration(days: i));
-        _selectedDates.add(_normalizeDate(day));
+        _tempSelectedDates.add(_normalizeDate(day));
       }
     });
   }
@@ -115,7 +119,7 @@ class _DateSelectionScreenState extends State<DateSelectionScreen> {
       for (int i = 0; i <= lastDay.day - 1; i++) {
         final day = firstDay.add(Duration(days: i));
         if (_isWeekendOrHoliday(day)) {
-          _selectedDates.add(_normalizeDate(day));
+          _tempSelectedDates.add(_normalizeDate(day));
         }
       }
     });
@@ -124,24 +128,43 @@ class _DateSelectionScreenState extends State<DateSelectionScreen> {
   // クリア
   void _clearSelection() {
     setState(() {
-      _selectedDates.clear();
+      _tempSelectedDates.clear();
     });
+  }
+
+  // 日付を確定してリスト画面へ遷移
+  void _confirmAndNavigate() {
+    if (_tempSelectedDates.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('日付を選択してください')),
+      );
+      return;
+    }
+
+    // Providerに日付を追加
+    ref.read(shiftDateProvider.notifier).addDates(_tempSelectedDates.toList());
+
+    // リスト画面へ遷移
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(
+        builder: (context) => const ShiftListScreen(),
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('日付選択'),
+        title: const Text('シフト日付選択'),
         backgroundColor: Theme.of(context).colorScheme.inversePrimary,
+        automaticallyImplyLeading: false,
         actions: [
           TextButton(
-            onPressed: () {
-              // 選択した日付を返して画面を閉じる
-              Navigator.pop(context, _selectedDates.toList());
-            },
+            onPressed: _confirmAndNavigate,
             child: const Text(
-              '完了',
+              '次へ',
               style: TextStyle(
                 color: Colors.white,
                 fontSize: 16,
@@ -226,7 +249,7 @@ class _DateSelectionScreenState extends State<DateSelectionScreen> {
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Text(
-                    '選択: ${_selectedDates.length}日',
+                    '選択: ${_tempSelectedDates.length}日',
                     style: const TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
@@ -307,7 +330,7 @@ class _DateSelectionScreenState extends State<DateSelectionScreen> {
 
   // 選択された日付のリスト
   Widget _buildSelectedDatesList() {
-    if (_selectedDates.isEmpty) {
+    if (_tempSelectedDates.isEmpty) {
       return const Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -324,7 +347,7 @@ class _DateSelectionScreenState extends State<DateSelectionScreen> {
     }
 
     // 日付を昇順にソート
-    final sortedDates = _selectedDates.toList()
+    final sortedDates = _tempSelectedDates.toList()
       ..sort((a, b) => a.compareTo(b));
 
     return ListView.builder(
