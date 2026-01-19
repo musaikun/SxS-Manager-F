@@ -111,7 +111,9 @@ class CalendarNotifier extends StateNotifier<CalendarState> {
       }
       state = state.copyWith(selectedDates: newSelected);
     } else {
-      final newDateJobMap = Map<String, Set<int>>.from(state.dateJobMap);
+      final newDateJobMap = state.dateJobMap.map(
+        (key, value) => MapEntry(key, Set<int>.from(value)),
+      );
       for (final date in dates) {
         final dateString = _formatDateString(date);
         newDateJobMap.putIfAbsent(dateString, () => {});
@@ -144,7 +146,9 @@ class CalendarNotifier extends StateNotifier<CalendarState> {
         }
         state = state.copyWith(selectedDates: newSelected);
       } else {
-        final newDateJobMap = Map<String, Set<int>>.from(state.dateJobMap);
+        final newDateJobMap = state.dateJobMap.map(
+          (key, value) => MapEntry(key, Set<int>.from(value)),
+        );
         for (final date in weekdayDates) {
           final dateString = _formatDateString(date);
           newDateJobMap[dateString]?.remove(state.currentJobId);
@@ -172,7 +176,9 @@ class CalendarNotifier extends StateNotifier<CalendarState> {
     if (state.currentJobId == null) {
       state = state.copyWith(selectedDates: {});
     } else {
-      final newDateJobMap = Map<String, Set<int>>.from(state.dateJobMap);
+      final newDateJobMap = state.dateJobMap.map(
+        (key, value) => MapEntry(key, Set<int>.from(value)),
+      );
       for (final entry in newDateJobMap.entries.toList()) {
         entry.value.remove(state.currentJobId);
         if (entry.value.isEmpty) {
@@ -208,7 +214,9 @@ class CalendarNotifier extends StateNotifier<CalendarState> {
   /// ジョブ削除
   void removeJob(int jobId) {
     final newJobs = state.jobs.where((j) => j.id != jobId).toList();
-    final newDateJobMap = Map<String, Set<int>>.from(state.dateJobMap);
+    final newDateJobMap = state.dateJobMap.map(
+      (key, value) => MapEntry(key, Set<int>.from(value)),
+    );
 
     // dateJobMapから該当ジョブを削除
     for (final entry in newDateJobMap.entries.toList()) {
@@ -327,7 +335,9 @@ class CalendarNotifier extends StateNotifier<CalendarState> {
 
       state = state.copyWith(selectedDates: newSelected);
     } else {
-      final newDateJobMap = Map<String, Set<int>>.from(state.dateJobMap);
+      final newDateJobMap = state.dateJobMap.map(
+        (key, value) => MapEntry(key, Set<int>.from(value)),
+      );
 
       for (final dateString in state.previousMonthData!) {
         final prevDate = DateTime.parse(dateString);
