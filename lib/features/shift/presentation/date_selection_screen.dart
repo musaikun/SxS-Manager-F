@@ -120,75 +120,57 @@ class _DateSelectionScreenState extends ConsumerState<DateSelectionScreen> {
     });
   }
 
-  // 曜日別選択（月=1, 日=7）
-  void _toggleWeekday(int weekday) {
+  // 共通: 条件に合う日付をトグル選択
+  void _toggleDatesWhere(bool Function(DateTime) condition) {
     setState(() {
-      final firstDay = DateTime(_focusedDay.year, _focusedDay.month, 1);
-      final lastDay = DateTime(_focusedDay.year, _focusedDay.month + 1, 0);
-
-      final weekdayDates = <DateTime>[];
-      for (int i = 0; i < lastDay.day; i++) {
-        final day = firstDay.add(Duration(days: i));
-        if (day.weekday == weekday) {
-          weekdayDates.add(_normalizeDate(day));
-        }
-      }
+      final dates = _getDatesInMonth(condition);
 
       // 全部選択済みか確認
-      final allSelected =
-          weekdayDates.every((d) => _tempSelectedDates.contains(d));
+      final allSelected = dates.every((d) => _tempSelectedDates.contains(d));
 
       if (allSelected) {
         // 解除
-        weekdayDates.forEach(_tempSelectedDates.remove);
+        dates.forEach(_tempSelectedDates.remove);
       } else {
         // 選択
-        _tempSelectedDates.addAll(weekdayDates);
+        _tempSelectedDates.addAll(dates);
       }
     });
   }
 
-  // 平日のみ選択
-  void _selectWeekdays() {
-    setState(() {
-      final firstDay = DateTime(_focusedDay.year, _focusedDay.month, 1);
-      final lastDay = DateTime(_focusedDay.year, _focusedDay.month + 1, 0);
+  // 共通: 月内の日付を取得
+  List<DateTime> _getDatesInMonth(bool Function(DateTime) condition) {
+    final firstDay = DateTime(_focusedDay.year, _focusedDay.month, 1);
+    final lastDay = DateTime(_focusedDay.year, _focusedDay.month + 1, 0);
 
-      for (int i = 0; i < lastDay.day; i++) {
-        final day = firstDay.add(Duration(days: i));
-        if (_isWeekday(day)) {
-          _tempSelectedDates.add(_normalizeDate(day));
-        }
+    final dates = <DateTime>[];
+    for (int i = 0; i < lastDay.day; i++) {
+      final day = firstDay.add(Duration(days: i));
+      if (condition(day)) {
+        dates.add(_normalizeDate(day));
       }
-    });
+    }
+    return dates;
   }
 
-  // 全日選択
-  void _selectAllDays() {
-    setState(() {
-      final firstDay = DateTime(_focusedDay.year, _focusedDay.month, 1);
-      final lastDay = DateTime(_focusedDay.year, _focusedDay.month + 1, 0);
-
-      for (int i = 0; i < lastDay.day; i++) {
-        final day = firstDay.add(Duration(days: i));
-        _tempSelectedDates.add(_normalizeDate(day));
-      }
-    });
+  // 曜日別選択（月=1, 日=7）
+  void _toggleWeekday(int weekday) {
+    _toggleDatesWhere((day) => day.weekday == weekday);
   }
 
-  // 土日祝日のみ選択
-  void _selectWeekendsAndHolidays() {
-    setState(() {
-      final firstDay = DateTime(_focusedDay.year, _focusedDay.month, 1);
-      final lastDay = DateTime(_focusedDay.year, _focusedDay.month + 1, 0);
+  // 平日トグル
+  void _toggleWeekdays() {
+    _toggleDatesWhere(_isWeekday);
+  }
 
-      for (int i = 0; i < lastDay.day; i++) {
-        final day = firstDay.add(Duration(days: i));
-        if (_isWeekendOrHoliday(day)) {
-          _tempSelectedDates.add(_normalizeDate(day));
-        }
-      }
-    });
+  // 全日トグル
+  void _toggleAllDays() {
+    _toggleDatesWhere((day) => true); // 全ての日付
+  }
+
+  // 土日祝日トグル
+  void _toggleWeekendsAndHolidays() {
+    _toggleDatesWhere(_isWeekendOrHoliday);
   }
 
   // クリア
@@ -264,6 +246,11 @@ class _DateSelectionScreenState extends ConsumerState<DateSelectionScreen> {
 
           const Divider(height: 1),
 
+          // アクションボタン（平日・全日・土日祝・クリア）
+          _buildActionButtons(),
+
+          const Divider(height: 1),
+
           // 曜日別選択ボタン
           _buildWeekdayButtons(),
 
@@ -286,7 +273,7 @@ class _DateSelectionScreenState extends ConsumerState<DateSelectionScreen> {
                 formatButtonVisible: false,
                 titleCentered: true,
                 titleTextStyle: TextStyle(
-                  fontSize: 18,
+                  fontSize: 20,
                   fontWeight: FontWeight.bold,
                 ),
               ),
@@ -303,32 +290,62 @@ class _DateSelectionScreenState extends ConsumerState<DateSelectionScreen> {
                   color: Theme.of(context).colorScheme.primary,
                   shape: BoxShape.circle,
                 ),
-                // 土曜日
-                weekendTextStyle: const TextStyle(color: Colors.blue),
-                // 休日（祝日）
-                holidayTextStyle: const TextStyle(color: Colors.red),
+                // 土曜日（青）
+                weekendTextStyle: const TextStyle(
+                  color: Colors.blue,
+                  fontWeight: FontWeight.w600,
+                ),
+                // 日曜日（赤）- これはweekendに含まれるが、個別設定
+                outsideTextStyle: TextStyle(color: Colors.grey[400]),
+                // 祝日（ピンク）
+                holidayTextStyle: const TextStyle(
+                  color: Colors.pink,
+                  fontWeight: FontWeight.w600,
+                ),
+                holidayDecoration: const BoxDecoration(
+                  shape: BoxShape.circle,
+                ),
               ),
 
-              // 祝日判定
-              holidayPredicate: (day) => _isHoliday(day),
+              // 曜日のスタイル設定
+              daysOfWeekStyle: DaysOfWeekStyle(
+                weekdayStyle: const TextStyle(fontWeight: FontWeight.bold),
+                weekendStyle: const TextStyle(
+                  color: Colors.red,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
 
-              // 日付タップ時の処理
-              onDaySelected: (selectedDay, focusedDay) {
-                _toggleDate(selectedDay);
-                setState(() {
-                  _focusedDay = focusedDay;
-                });
-              },
-
-              // ページ変更時の処理
-              onPageChanged: (focusedDay) {
-                setState(() {
-                  _focusedDay = focusedDay;
-                });
-              },
-
-              // カスタムビルダー
+              // カスタムビルダーで日曜日を赤色に
               calendarBuilders: CalendarBuilders(
+                // デフォルトの日付表示をカスタマイズ
+                defaultBuilder: (context, day, focusedDay) {
+                  // 日曜日を赤色に
+                  if (day.weekday == DateTime.sunday) {
+                    return Center(
+                      child: Text(
+                        '${day.day}',
+                        style: const TextStyle(
+                          color: Colors.red,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    );
+                  }
+                  // 土曜日を青色に
+                  if (day.weekday == DateTime.saturday) {
+                    return Center(
+                      child: Text(
+                        '${day.day}',
+                        style: const TextStyle(
+                          color: Colors.blue,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    );
+                  }
+                  return null; // デフォルトの表示
+                },
                 // 日付の下に複数店舗インジケーターを表示
                 markerBuilder: (context, day, events) {
                   final count = ref
@@ -370,19 +387,39 @@ class _DateSelectionScreenState extends ConsumerState<DateSelectionScreen> {
 
           // 選択数表示
           Container(
-            padding: const EdgeInsets.all(12),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
             decoration: BoxDecoration(
-              color: Colors.grey[200],
+              gradient: LinearGradient(
+                colors: [
+                  Theme.of(context).colorScheme.primaryContainer,
+                  Theme.of(context).colorScheme.primaryContainer.withOpacity(0.7),
+                ],
+              ),
               border: const Border(top: BorderSide(color: Colors.grey, width: 1)),
             ),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                const Icon(Icons.check_circle, size: 20),
-                const SizedBox(width: 8),
+                Container(
+                  padding: const EdgeInsets.all(6),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    Icons.check_circle,
+                    size: 20,
+                    color: Theme.of(context).colorScheme.primary,
+                  ),
+                ),
+                const SizedBox(width: 12),
                 Text(
                   '選択: ${_tempSelectedDates.length}日',
-                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: Theme.of(context).colorScheme.onPrimaryContainer,
+                  ),
                 ),
               ],
             ),
@@ -395,15 +432,36 @@ class _DateSelectionScreenState extends ConsumerState<DateSelectionScreen> {
   // 店舗セレクター
   Widget _buildStoreSelector(List<Store> stores) {
     return Container(
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.withOpacity(0.1),
+            spreadRadius: 1,
+            blurRadius: 3,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            '店舗選択',
-            style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+          Row(
+            children: [
+              const Icon(Icons.store, size: 20, color: Colors.grey),
+              const SizedBox(width: 8),
+              const Text(
+                '勤務先を選択',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.black87,
+                ),
+              ),
+            ],
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 12),
           Wrap(
             spacing: 8,
             runSpacing: 8,
@@ -420,19 +478,32 @@ class _DateSelectionScreenState extends ConsumerState<DateSelectionScreen> {
                       });
                     }
                   },
-                  selectedColor: store.color.withOpacity(0.7),
-                  backgroundColor: store.color.withOpacity(0.2),
+                  selectedColor: store.color,
+                  backgroundColor: store.color.withOpacity(0.15),
+                  side: BorderSide(
+                    color: isSelected ? store.color : store.color.withOpacity(0.3),
+                    width: 2,
+                  ),
                   labelStyle: TextStyle(
                     color: isSelected ? Colors.white : Colors.black87,
                     fontWeight: FontWeight.bold,
+                    fontSize: 13,
                   ),
+                  elevation: isSelected ? 4 : 0,
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                 );
               }),
               // 店舗追加ボタン
               ActionChip(
-                avatar: const Icon(Icons.add, size: 16),
-                label: const Text('店舗追加'),
+                avatar: const Icon(Icons.add, size: 18),
+                label: const Text(
+                  '店舗追加',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
                 onPressed: () => _showAddStoreDialog(context),
+                elevation: 2,
+                backgroundColor: Colors.grey[100],
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
               ),
             ],
           ),
@@ -485,52 +556,71 @@ class _DateSelectionScreenState extends ConsumerState<DateSelectionScreen> {
     );
   }
 
-  // アクションボタン
+  // アクションボタン（トグル式）
   Widget _buildActionButtons() {
-    return Padding(
+    return Container(
       padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.grey[50],
+      ),
       child: Row(
         children: [
           Expanded(
-            child: OutlinedButton.icon(
-              onPressed: _selectWeekdays,
-              icon: const Icon(Icons.business_center, size: 16),
-              label: const Text('平日', style: TextStyle(fontSize: 12)),
-              style: OutlinedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(vertical: 8),
+            child: ElevatedButton.icon(
+              onPressed: _toggleWeekdays,
+              icon: const Icon(Icons.business_center, size: 18),
+              label: const Text('平日', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
+              style: ElevatedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                elevation: 2,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
               ),
             ),
           ),
-          const SizedBox(width: 6),
+          const SizedBox(width: 8),
           Expanded(
-            child: OutlinedButton.icon(
-              onPressed: _selectAllDays,
-              icon: const Icon(Icons.calendar_month, size: 16),
-              label: const Text('全日', style: TextStyle(fontSize: 12)),
-              style: OutlinedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(vertical: 8),
+            child: ElevatedButton.icon(
+              onPressed: _toggleAllDays,
+              icon: const Icon(Icons.calendar_month, size: 18),
+              label: const Text('全日', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
+              style: ElevatedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                elevation: 2,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
               ),
             ),
           ),
-          const SizedBox(width: 6),
+          const SizedBox(width: 8),
           Expanded(
-            child: OutlinedButton.icon(
-              onPressed: _selectWeekendsAndHolidays,
-              icon: const Icon(Icons.weekend, size: 16),
-              label: const Text('土日祝', style: TextStyle(fontSize: 12)),
-              style: OutlinedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(vertical: 8),
+            child: ElevatedButton.icon(
+              onPressed: _toggleWeekendsAndHolidays,
+              icon: const Icon(Icons.weekend, size: 18),
+              label: const Text('土日祝', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
+              style: ElevatedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                elevation: 2,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
               ),
             ),
           ),
-          const SizedBox(width: 6),
+          const SizedBox(width: 8),
           Expanded(
             child: OutlinedButton.icon(
               onPressed: _clearSelection,
-              icon: const Icon(Icons.clear, size: 16),
-              label: const Text('クリア', style: TextStyle(fontSize: 12)),
+              icon: const Icon(Icons.clear, size: 18, color: Colors.red),
+              label: const Text('クリア', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.red)),
               style: OutlinedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(vertical: 8),
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                side: const BorderSide(color: Colors.red, width: 2),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
               ),
             ),
           ),
