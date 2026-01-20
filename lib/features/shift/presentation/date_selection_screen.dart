@@ -18,7 +18,7 @@ class DateSelectionScreen extends ConsumerStatefulWidget {
 class _DateSelectionScreenState extends ConsumerState<DateSelectionScreen> {
   // カレンダーの状態
   DateTime _focusedDay = DateTime.now();
-  CalendarFormat _calendarFormat = CalendarFormat.month();
+  CalendarFormat _calendarFormat = CalendarFormat.month;
 
   // 一時的な選択（確定前）
   final Set<DateTime> _tempSelectedDates = {};
