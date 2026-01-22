@@ -110,6 +110,12 @@ class _DateSelectionScreenState extends ConsumerState<DateSelectionScreen> {
 
   // 日付の選択/解除
   void _toggleDate(DateTime day) {
+    // 過去の日付は選択できない
+    final today = _normalizeDate(DateTime.now());
+    if (_normalizeDate(day).isBefore(today)) {
+      return;
+    }
+
     setState(() {
       final normalized = _normalizeDate(day);
       if (_tempSelectedDates.contains(normalized)) {
@@ -268,6 +274,20 @@ class _DateSelectionScreenState extends ConsumerState<DateSelectionScreen> {
               // 複数選択モード
               selectedDayPredicate: (day) => _isSelected(day),
 
+              // 過去の日付を無効化
+              enabledDayPredicate: (day) {
+                final today = _normalizeDate(DateTime.now());
+                return !_normalizeDate(day).isBefore(today);
+              },
+
+              // 日付タップ時の処理
+              onDaySelected: (selectedDay, focusedDay) {
+                _toggleDate(selectedDay);
+                setState(() {
+                  _focusedDay = focusedDay;
+                });
+              },
+
               // ヘッダースタイル
               headerStyle: const HeaderStyle(
                 formatButtonVisible: false,
@@ -285,10 +305,10 @@ class _DateSelectionScreenState extends ConsumerState<DateSelectionScreen> {
                   color: Theme.of(context).colorScheme.primary.withOpacity(0.3),
                   shape: BoxShape.circle,
                 ),
-                // 選択された日
+                // 選択された日（四角形に変更）
                 selectedDecoration: BoxDecoration(
                   color: Theme.of(context).colorScheme.primary,
-                  shape: BoxShape.circle,
+                  borderRadius: BorderRadius.circular(8),
                 ),
                 // 土曜日（青）
                 weekendTextStyle: const TextStyle(
@@ -318,8 +338,88 @@ class _DateSelectionScreenState extends ConsumerState<DateSelectionScreen> {
 
               // カスタムビルダーで日曜日を赤色に
               calendarBuilders: CalendarBuilders(
+                // 選択された日付のカスタム表示（四角形 + 店舗ドット）
+                selectedBuilder: (context, day, focusedDay) {
+                  // この日付にシフトが登録されている店舗を取得
+                  final shifts = ref
+                      .read(shiftDateProvider.notifier)
+                      .getShiftsForDate(day);
+                  final stores = ref.read(storeProvider);
+
+                  // 店舗カラーマップ（最大4店舗、指定の4色）
+                  final dotColors = [
+                    Colors.red,
+                    Colors.blue,
+                    Colors.yellow,
+                    Colors.green,
+                  ];
+
+                  return Container(
+                    margin: const EdgeInsets.all(4),
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).colorScheme.primary,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        // 日付
+                        Text(
+                          '${day.day}',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                          ),
+                        ),
+                        // 店舗ドット（登録済みの店舗のみ表示）
+                        if (shifts.isNotEmpty) ...[
+                          const SizedBox(height: 2),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: shifts.take(4).map((shift) {
+                              // 店舗のインデックスを取得してドット色を決定
+                              final storeIndex = stores.indexWhere(
+                                (s) => s.id == shift.storeId,
+                              );
+                              final dotColor = storeIndex >= 0 && storeIndex < 4
+                                  ? dotColors[storeIndex]
+                                  : Colors.white;
+
+                              return Container(
+                                margin: const EdgeInsets.symmetric(horizontal: 1),
+                                width: 6,
+                                height: 6,
+                                decoration: BoxDecoration(
+                                  color: dotColor,
+                                  shape: BoxShape.circle,
+                                  border: Border.all(
+                                    color: Colors.white.withOpacity(0.5),
+                                    width: 0.5,
+                                  ),
+                                ),
+                              );
+                            }).toList(),
+                          ),
+                        ],
+                      ],
+                    ),
+                  );
+                },
                 // デフォルトの日付表示をカスタマイズ
                 defaultBuilder: (context, day, focusedDay) {
+                  // 祝日をピンク色に（最優先）
+                  if (_isHoliday(day)) {
+                    return Center(
+                      child: Text(
+                        '${day.day}',
+                        style: const TextStyle(
+                          color: Colors.pink,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    );
+                  }
                   // 日曜日を赤色に
                   if (day.weekday == DateTime.sunday) {
                     return Center(
@@ -345,6 +445,18 @@ class _DateSelectionScreenState extends ConsumerState<DateSelectionScreen> {
                     );
                   }
                   return null; // デフォルトの表示
+                },
+                // 過去の日付を無効化
+                disabledBuilder: (context, day, focusedDay) {
+                  return Center(
+                    child: Text(
+                      '${day.day}',
+                      style: TextStyle(
+                        color: Colors.grey[400],
+                        fontWeight: FontWeight.w400,
+                      ),
+                    ),
+                  );
                 },
                 // 日付の下に複数店舗インジケーターを表示
                 markerBuilder: (context, day, events) {
@@ -381,9 +493,6 @@ class _DateSelectionScreenState extends ConsumerState<DateSelectionScreen> {
           ),
 
           const Divider(height: 1),
-
-          // 選択ボタン
-          _buildActionButtons(),
 
           // 選択数表示
           Container(
@@ -514,22 +623,24 @@ class _DateSelectionScreenState extends ConsumerState<DateSelectionScreen> {
 
   // 曜日別選択ボタン
   Widget _buildWeekdayButtons() {
-    final weekdays = ['月', '火', '水', '木', '金', '土', '日'];
+    // 日曜日始まりに変更
+    final weekdays = ['日', '月', '火', '水', '木', '金', '土'];
     final colors = [
-      Colors.grey,
-      Colors.grey,
-      Colors.grey,
-      Colors.grey,
-      Colors.grey,
-      Colors.blue,
-      Colors.red,
+      Colors.red,    // 日
+      Colors.grey,   // 月
+      Colors.grey,   // 火
+      Colors.grey,   // 水
+      Colors.grey,   // 木
+      Colors.grey,   // 金
+      Colors.blue,   // 土
     ];
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       child: Row(
         children: List.generate(7, (index) {
-          final weekday = index + 1; // 1=月, 7=日
+          // DateTime.sunday=7, Monday=1なので、日曜は7、月〜土は1〜6
+          final weekday = index == 0 ? DateTime.sunday : index;
           return Expanded(
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 2),
