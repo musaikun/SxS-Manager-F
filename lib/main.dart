@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'models/time_range.dart';
+import 'widgets/time_setting_modal.dart';
 
 void main() {
   runApp(const MyApp());
@@ -30,12 +32,20 @@ class MyHomePage extends StatefulWidget {
 }
 
 class _MyHomePageState extends State<MyHomePage> {
-  int _counter = 0;
+  TimeRange? _selectedTimeRange;
 
-  void _incrementCounter() {
-    setState(() {
-      _counter++;
-    });
+  Future<void> _openTimeSettingModal() async {
+    final result = await TimeSettingModal.show(
+      context,
+      initialTimeRange: _selectedTimeRange,
+      title: 'シフト時間設定',
+    );
+
+    if (result != null) {
+      setState(() {
+        _selectedTimeRange = result;
+      });
+    }
   }
 
   @override
@@ -49,20 +59,29 @@ class _MyHomePageState extends State<MyHomePage> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: <Widget>[
-            const Text(
-              'ボタンを押した回数:',
-            ),
-            Text(
-              '$_counter',
-              style: Theme.of(context).textTheme.headlineMedium,
+            if (_selectedTimeRange != null) ...[
+              const Text('選択された時間:'),
+              const SizedBox(height: 8),
+              Text(
+                _selectedTimeRange!.formattedRange,
+                style: Theme.of(context).textTheme.headlineMedium,
+              ),
+              const SizedBox(height: 8),
+              Text(
+                '勤務時間: ${_selectedTimeRange!.durationInMinutes ~/ 60}時間${_selectedTimeRange!.durationInMinutes % 60}分',
+                style: Theme.of(context).textTheme.bodyLarge,
+              ),
+            ] else ...[
+              const Text('時間が設定されていません'),
+            ],
+            const SizedBox(height: 32),
+            FilledButton.icon(
+              onPressed: _openTimeSettingModal,
+              icon: const Icon(Icons.schedule),
+              label: const Text('時間を設定'),
             ),
           ],
         ),
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _incrementCounter,
-        tooltip: 'Increment',
-        child: const Icon(Icons.add),
       ),
     );
   }
