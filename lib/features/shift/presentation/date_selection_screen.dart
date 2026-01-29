@@ -130,16 +130,22 @@ class _DateSelectionScreenState extends ConsumerState<DateSelectionScreen> {
   void _toggleDatesWhere(bool Function(DateTime) condition) {
     setState(() {
       final dates = _getDatesInMonth(condition);
+      final today = _normalizeDate(DateTime.now());
+
+      // 過去日付を除外（表示されている月でも過去は選択不可）
+      final validDates = dates.where((d) => !d.isBefore(today)).toList();
+
+      if (validDates.isEmpty) return;
 
       // 全部選択済みか確認
-      final allSelected = dates.every((d) => _tempSelectedDates.contains(d));
+      final allSelected = validDates.every((d) => _tempSelectedDates.contains(d));
 
       if (allSelected) {
         // 解除
-        dates.forEach(_tempSelectedDates.remove);
+        validDates.forEach(_tempSelectedDates.remove);
       } else {
         // 選択
-        _tempSelectedDates.addAll(dates);
+        _tempSelectedDates.addAll(validDates);
       }
     });
   }
@@ -354,55 +360,58 @@ class _DateSelectionScreenState extends ConsumerState<DateSelectionScreen> {
                     Colors.green,
                   ];
 
-                  return Container(
-                    margin: const EdgeInsets.all(4),
-                    decoration: BoxDecoration(
-                      color: Theme.of(context).colorScheme.primary,
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        // 日付
-                        Text(
-                          '${day.day}',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 16,
+                  return Center(
+                    child: Container(
+                      width: 40,  // 固定幅（1桁でも2桁でも同じサイズ）
+                      height: 40, // 固定高さ
+                      decoration: BoxDecoration(
+                        color: Theme.of(context).colorScheme.primary,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          // 日付
+                          Text(
+                            '${day.day}',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 16,
+                            ),
                           ),
-                        ),
-                        // 店舗ドット（登録済みの店舗のみ表示）
-                        if (shifts.isNotEmpty) ...[
-                          const SizedBox(height: 2),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: shifts.take(4).map((shift) {
-                              // 店舗のインデックスを取得してドット色を決定
-                              final storeIndex = stores.indexWhere(
-                                (s) => s.id == shift.storeId,
-                              );
-                              final dotColor = storeIndex >= 0 && storeIndex < 4
-                                  ? dotColors[storeIndex]
-                                  : Colors.white;
+                          // 店舗ドット（登録済みの店舗のみ表示）
+                          if (shifts.isNotEmpty) ...[
+                            const SizedBox(height: 2),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: shifts.take(4).map((shift) {
+                                // 店舗のインデックスを取得してドット色を決定
+                                final storeIndex = stores.indexWhere(
+                                  (s) => s.id == shift.storeId,
+                                );
+                                final dotColor = storeIndex >= 0 && storeIndex < 4
+                                    ? dotColors[storeIndex]
+                                    : Colors.white;
 
-                              return Container(
-                                margin: const EdgeInsets.symmetric(horizontal: 1),
-                                width: 6,
-                                height: 6,
-                                decoration: BoxDecoration(
-                                  color: dotColor,
-                                  shape: BoxShape.circle,
-                                  border: Border.all(
-                                    color: Colors.white.withOpacity(0.5),
-                                    width: 0.5,
+                                return Container(
+                                  margin: const EdgeInsets.symmetric(horizontal: 1),
+                                  width: 6,
+                                  height: 6,
+                                  decoration: BoxDecoration(
+                                    color: dotColor,
+                                    shape: BoxShape.circle,
+                                    border: Border.all(
+                                      color: Colors.white.withOpacity(0.5),
+                                      width: 0.5,
+                                    ),
                                   ),
-                                ),
-                              );
-                            }).toList(),
-                          ),
+                                );
+                              }).toList(),
+                            ),
+                          ],
                         ],
-                      ],
+                      ),
                     ),
                   );
                 },
