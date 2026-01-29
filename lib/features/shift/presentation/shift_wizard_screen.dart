@@ -169,7 +169,6 @@ class _ShiftWizardScreenState extends ConsumerState<ShiftWizardScreen> {
 
   Widget _buildIndicatorDot(int page, String label) {
     final isActive = _currentPage == page;
-    final isPassed = _currentPage > page;
 
     return InkWell(
       onTap: () => _jumpToPage(page),
@@ -183,22 +182,32 @@ class _ShiftWizardScreenState extends ConsumerState<ShiftWizardScreen> {
               width: 32,
               height: 32,
               decoration: BoxDecoration(
-                color: isActive || isPassed
+                color: isActive
                     ? Theme.of(context).colorScheme.primary
                     : Colors.grey[300],
                 shape: BoxShape.circle,
+                boxShadow: isActive
+                    ? [
+                        BoxShadow(
+                          color: Theme.of(context)
+                              .colorScheme
+                              .primary
+                              .withOpacity(0.5),
+                          blurRadius: 12,
+                          spreadRadius: 2,
+                        ),
+                      ]
+                    : null,
               ),
               child: Center(
-                child: isPassed
-                    ? const Icon(Icons.check, color: Colors.white, size: 18)
-                    : Text(
-                        '${page + 1}',
-                        style: TextStyle(
-                          color: isActive ? Colors.white : Colors.grey[600],
-                          fontWeight: FontWeight.bold,
-                          fontSize: 14,
-                        ),
-                      ),
+                child: Text(
+                  '${page + 1}',
+                  style: TextStyle(
+                    color: isActive ? Colors.white : Colors.grey[600],
+                    fontWeight: FontWeight.bold,
+                    fontSize: 14,
+                  ),
+                ),
               ),
             ),
             const SizedBox(height: 4),
@@ -219,11 +228,11 @@ class _ShiftWizardScreenState extends ConsumerState<ShiftWizardScreen> {
   }
 
   Widget _buildIndicatorLine(int index) {
-    final isPassed = _currentPage > index;
+    final isActive = _currentPage > index;
     return Container(
       width: 40,
       height: 2,
-      color: isPassed
+      color: isActive
           ? Theme.of(context).colorScheme.primary
           : Colors.grey[300],
     );
@@ -435,6 +444,10 @@ class _DateSelectionPageState extends ConsumerState<_DateSelectionPage> {
               },
               onDaySelected: (selectedDay, focusedDay) {
                 _toggleDate(selectedDay);
+                widget.onFocusedDayChanged(focusedDay);
+              },
+              onPageChanged: (focusedDay) {
+                // 月が変わったらfocusedDayを更新（重要：これがないと翌月の一括選択が機能しない）
                 widget.onFocusedDayChanged(focusedDay);
               },
               headerStyle: const HeaderStyle(
@@ -1229,7 +1242,12 @@ class _ConfirmationPage extends ConsumerWidget {
                   child: SafeArea(
                     child: ElevatedButton(
                       onPressed: () {
-                        _showSubmitDialog(context);
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('シフトを提出しました（※機能は未実装）'),
+                            duration: Duration(seconds: 2),
+                          ),
+                        );
                       },
                       style: ElevatedButton.styleFrom(
                         padding: const EdgeInsets.symmetric(vertical: 16),
@@ -1250,34 +1268,6 @@ class _ConfirmationPage extends ConsumerWidget {
                 ),
               ],
             ),
-    );
-  }
-
-  void _showSubmitDialog(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('提出確認'),
-        content: const Text('このシフトを提出しますか？'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('キャンセル'),
-          ),
-          TextButton(
-            onPressed: () {
-              Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('シフトを提出しました（※機能は未実装）'),
-                  duration: Duration(seconds: 2),
-                ),
-              );
-            },
-            child: const Text('提出'),
-          ),
-        ],
-      ),
     );
   }
 }
