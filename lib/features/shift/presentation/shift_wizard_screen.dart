@@ -120,8 +120,15 @@ class _ShiftWizardScreenState extends ConsumerState<ShiftWizardScreen> {
                   selectedStoreId: _selectedStoreId,
                   focusedDay: _focusedDay,
                   onStoreChanged: (storeId) {
+                    // 店舗切り替え前に、現在の一時選択をProviderに同期
+                    print('🏪 Store changing: $_selectedStoreId -> $storeId');
+                    _syncDateSelectionToProvider();
+
                     setState(() {
                       _selectedStoreId = storeId;
+                      // 新しい店舗用の一時選択をクリア
+                      _tempSelectedDates.clear();
+                      print('   ✅ Cleared temp selection for new store');
                     });
                   },
                   onFocusedDayChanged: (day) {
@@ -328,7 +335,14 @@ class _DateSelectionPageState extends ConsumerState<_DateSelectionPage> {
 
   bool _isSelected(DateTime day) {
     final normalized = _normalizeDate(day);
-    return widget.tempSelectedDates.contains(normalized);
+
+    // Provider内にこの日付のシフトが存在するか、または一時選択されているか
+    final hasShiftInProvider = ref
+        .read(shiftDateProvider.notifier)
+        .getShiftCountForDate(day) > 0;
+    final isInTempSelection = widget.tempSelectedDates.contains(normalized);
+
+    return hasShiftInProvider || isInTempSelection;
   }
 
   bool _isHoliday(DateTime day) {
@@ -353,19 +367,41 @@ class _DateSelectionPageState extends ConsumerState<_DateSelectionPage> {
       return;
     }
 
+    if (widget.selectedStoreId == null) {
+      print('⚠️ No store selected');
+      return;
+    }
+
     setState(() {
       final normalized = _normalizeDate(day);
-      if (widget.tempSelectedDates.contains(normalized)) {
+      final dateString = '${normalized.year}-${normalized.month.toString().padLeft(2, '0')}-${normalized.day.toString().padLeft(2, '0')}';
+      final uniqueKey = '${dateString}_${widget.selectedStoreId}';
+
+      // 現在の店舗でこの日付のシフトが既にProviderに存在するかチェック
+      final existingShift = ref.read(shiftDateProvider).firstWhere(
+            (shift) => shift.uniqueKey == uniqueKey,
+            orElse: () => null as dynamic,
+          );
+
+      if (existingShift != null) {
+        // 既存のシフトを削除
+        ref.read(shiftDateProvider.notifier).removeDate(uniqueKey);
         widget.tempSelectedDates.remove(normalized);
-        print('➖ Removed date: $normalized (total: ${widget.tempSelectedDates.length})');
+        print('➖ Removed shift: $uniqueKey from Provider');
       } else {
+        // 一時選択に追加（ページ移動時にProviderに同期される）
         widget.tempSelectedDates.add(normalized);
-        print('➕ Added date: $normalized (total: ${widget.tempSelectedDates.length})');
+        print('➕ Added date to temp: $normalized (total: ${widget.tempSelectedDates.length})');
       }
     });
   }
 
   void _toggleDatesWhere(bool Function(DateTime) condition) {
+    if (widget.selectedStoreId == null) {
+      print('⚠️ No store selected for batch operation');
+      return;
+    }
+
     setState(() {
       final dates = _getDatesInMonth(condition);
       final today = _normalizeDate(DateTime.now());
@@ -373,13 +409,56 @@ class _DateSelectionPageState extends ConsumerState<_DateSelectionPage> {
 
       if (validDates.isEmpty) return;
 
-      final allSelected =
-          validDates.every((d) => widget.tempSelectedDates.contains(d));
+      // 現在の店舗で、これらの日付が全て選択済みか確認
+      final allSelected = validDates.every((date) {
+        final dateString =
+            '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
+        final uniqueKey = '${dateString}_${widget.selectedStoreId}';
+
+        // Providerに存在するか、または一時選択されているか
+        final existsInProvider = ref.read(shiftDateProvider).any(
+              (shift) => shift.uniqueKey == uniqueKey,
+            );
+        final isInTemp = widget.tempSelectedDates.contains(date);
+
+        return existsInProvider || isInTemp;
+      });
 
       if (allSelected) {
-        validDates.forEach(widget.tempSelectedDates.remove);
+        // 解除：Providerから削除 & 一時選択から削除
+        for (final date in validDates) {
+          final dateString =
+              '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
+          final uniqueKey = '${dateString}_${widget.selectedStoreId}';
+
+          // Providerから削除
+          final existsInProvider = ref.read(shiftDateProvider).any(
+                (shift) => shift.uniqueKey == uniqueKey,
+              );
+          if (existsInProvider) {
+            ref.read(shiftDateProvider.notifier).removeDate(uniqueKey);
+          }
+
+          // 一時選択から削除
+          widget.tempSelectedDates.remove(date);
+        }
+        print('➖ Batch removed ${validDates.length} dates');
       } else {
-        widget.tempSelectedDates.addAll(validDates);
+        // 選択：一時選択に追加（既にProviderにあるものは除外）
+        for (final date in validDates) {
+          final dateString =
+              '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
+          final uniqueKey = '${dateString}_${widget.selectedStoreId}';
+
+          final existsInProvider = ref.read(shiftDateProvider).any(
+                (shift) => shift.uniqueKey == uniqueKey,
+              );
+
+          if (!existsInProvider) {
+            widget.tempSelectedDates.add(date);
+          }
+        }
+        print('➕ Batch added ${validDates.length} dates to temp');
       }
     });
   }
