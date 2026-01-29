@@ -38,43 +38,44 @@ class _ShiftWizardScreenState extends ConsumerState<ShiftWizardScreen> {
       });
     });
 
-    // ページ変更を監視
-    _pageController.addListener(_onPageControllerUpdate);
+    // ページ変更の監視は不要（onPageChangedで処理）
   }
 
   @override
   void dispose() {
-    _pageController.removeListener(_onPageControllerUpdate);
     _pageController.dispose();
     super.dispose();
   }
 
-  // PageControllerの更新を監視
-  void _onPageControllerUpdate() {
-    final page = _pageController.page?.round() ?? 0;
-    if (page != _currentPage) {
-      setState(() {
-        _currentPage = page;
-      });
-    }
-  }
-
   // ページ変更時の処理（重要：状態同期）
   void _syncDateSelectionToProvider() {
-    if (_tempSelectedDates.isEmpty || _selectedStoreId == null) return;
+    print('🔄 _syncDateSelectionToProvider called');
+    print('   _tempSelectedDates: ${_tempSelectedDates.length} dates');
+    print('   _selectedStoreId: $_selectedStoreId');
+
+    if (_tempSelectedDates.isEmpty || _selectedStoreId == null) {
+      print('   ⚠️ Skipped: isEmpty=${_tempSelectedDates.isEmpty}, storeId=$_selectedStoreId');
+      return;
+    }
 
     // 一時選択状態をProviderに同期
+    print('   ✅ Syncing to provider...');
     ref
         .read(shiftDateProvider.notifier)
         .addDates(_tempSelectedDates.toList(), _selectedStoreId!);
+    print('   ✅ Sync completed');
   }
 
   // ページ移動（インジケーターからの移動用）
   void _jumpToPage(int page) {
+    print('🔘 _jumpToPage: $_currentPage -> $page');
+
     // ページ1から離れる場合、Providerに同期
     if (_currentPage == 0 && page != 0) {
+      print('   🔄 Triggering sync from page 0 (jumpTo)');
       _syncDateSelectionToProvider();
     }
+
     _pageController.animateToPage(
       page,
       duration: const Duration(milliseconds: 300),
@@ -95,8 +96,20 @@ class _ShiftWizardScreenState extends ConsumerState<ShiftWizardScreen> {
             child: PageView(
               controller: _pageController,
               onPageChanged: (page) {
+                print('📄 PageView onPageChanged: $_currentPage -> $page');
+
                 // ページ1から離れる時、自動的にProviderに同期
-                if (_currentPage == 0 && page != 0) {
+                // 重要：_currentPageが更新される前にチェックする必要がある
+                final wasOnDateSelection = _currentPage == 0;
+
+                // _currentPageを更新
+                setState(() {
+                  _currentPage = page;
+                });
+
+                // ページ1から離れた場合のみ同期
+                if (wasOnDateSelection && page != 0) {
+                  print('   🔄 Triggering sync from page 0');
                   _syncDateSelectionToProvider();
                 }
               },
@@ -335,14 +348,19 @@ class _DateSelectionPageState extends ConsumerState<_DateSelectionPage> {
 
   void _toggleDate(DateTime day) {
     final today = _normalizeDate(DateTime.now());
-    if (_normalizeDate(day).isBefore(today)) return;
+    if (_normalizeDate(day).isBefore(today)) {
+      print('⛔ Past date rejected: $day');
+      return;
+    }
 
     setState(() {
       final normalized = _normalizeDate(day);
       if (widget.tempSelectedDates.contains(normalized)) {
         widget.tempSelectedDates.remove(normalized);
+        print('➖ Removed date: $normalized (total: ${widget.tempSelectedDates.length})');
       } else {
         widget.tempSelectedDates.add(normalized);
+        print('➕ Added date: $normalized (total: ${widget.tempSelectedDates.length})');
       }
     });
   }
