@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'features/shift/presentation/date_selection_screen.dart';
+import 'features/shift/presentation/shift_wizard_screen.dart';
 
 void main() {
   runApp(
@@ -32,7 +32,7 @@ class MyApp extends StatelessWidget {
         Locale('ja', 'JP'),
       ],
       locale: const Locale('ja', 'JP'),
-      home: const DateSelectionScreen(),
+      home: const ShiftWizardScreen(),
     );
   }
 }
