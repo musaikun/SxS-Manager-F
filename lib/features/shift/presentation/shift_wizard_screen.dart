@@ -33,15 +33,23 @@ class _ShiftWizardScreenState extends ConsumerState<ShiftWizardScreen> {
 
   // ページ変更時の処理（重要：状態同期）
   void _syncDateSelectionToProvider() {
-    if (_tempSelectedDates.isEmpty) return;
-
     // デフォルト店舗を取得
     final defaultStore = ref.read(defaultStoreProvider);
 
-    // 一時選択状態をProviderに同期
-    ref
-        .read(shiftDateProvider.notifier)
-        .addDates(_tempSelectedDates.toList(), defaultStore.id);
+    // 重要：現在Providerにあるデフォルト店舗のシフトを全削除
+    final currentShifts = ref.read(shiftDateProvider);
+    for (final shift in currentShifts.toList()) {
+      if (shift.storeId == defaultStore.id) {
+        ref.read(shiftDateProvider.notifier).removeDate(shift.uniqueKey);
+      }
+    }
+
+    // _tempSelectedDatesの内容を新規登録
+    if (_tempSelectedDates.isNotEmpty) {
+      ref
+          .read(shiftDateProvider.notifier)
+          .addDates(_tempSelectedDates.toList(), defaultStore.id);
+    }
   }
 
   // ページ移動（インジケーターからの移動用）
