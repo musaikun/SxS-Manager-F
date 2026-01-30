@@ -23,23 +23,7 @@ class _ShiftWizardScreenState extends ConsumerState<ShiftWizardScreen> {
 
   // ページ1: 日付選択の一時状態
   final Set<DateTime> _tempSelectedDates = {};
-  String? _selectedStoreId;
   DateTime _focusedDay = DateTime.now();
-
-  @override
-  void initState() {
-    super.initState();
-
-    // 初回起動時にデフォルト店舗を選択
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      final defaultStore = ref.read(defaultStoreProvider);
-      setState(() {
-        _selectedStoreId = defaultStore.id;
-      });
-    });
-
-    // ページ変更の監視は不要（onPageChangedで処理）
-  }
 
   @override
   void dispose() {
@@ -49,30 +33,21 @@ class _ShiftWizardScreenState extends ConsumerState<ShiftWizardScreen> {
 
   // ページ変更時の処理（重要：状態同期）
   void _syncDateSelectionToProvider() {
-    print('🔄 _syncDateSelectionToProvider called');
-    print('   _tempSelectedDates: ${_tempSelectedDates.length} dates');
-    print('   _selectedStoreId: $_selectedStoreId');
+    if (_tempSelectedDates.isEmpty) return;
 
-    if (_tempSelectedDates.isEmpty || _selectedStoreId == null) {
-      print('   ⚠️ Skipped: isEmpty=${_tempSelectedDates.isEmpty}, storeId=$_selectedStoreId');
-      return;
-    }
+    // デフォルト店舗を取得
+    final defaultStore = ref.read(defaultStoreProvider);
 
     // 一時選択状態をProviderに同期
-    print('   ✅ Syncing to provider...');
     ref
         .read(shiftDateProvider.notifier)
-        .addDates(_tempSelectedDates.toList(), _selectedStoreId!);
-    print('   ✅ Sync completed');
+        .addDates(_tempSelectedDates.toList(), defaultStore.id);
   }
 
   // ページ移動（インジケーターからの移動用）
   void _jumpToPage(int page) {
-    print('🔘 _jumpToPage: $_currentPage -> $page');
-
     // ページ1から離れる場合、Providerに同期
     if (_currentPage == 0 && page != 0) {
-      print('   🔄 Triggering sync from page 0 (jumpTo)');
       _syncDateSelectionToProvider();
     }
 
@@ -96,10 +71,7 @@ class _ShiftWizardScreenState extends ConsumerState<ShiftWizardScreen> {
             child: PageView(
               controller: _pageController,
               onPageChanged: (page) {
-                print('📄 PageView onPageChanged: $_currentPage -> $page');
-
                 // ページ1から離れる時、自動的にProviderに同期
-                // 重要：_currentPageが更新される前にチェックする必要がある
                 final wasOnDateSelection = _currentPage == 0;
 
                 // _currentPageを更新
@@ -109,7 +81,6 @@ class _ShiftWizardScreenState extends ConsumerState<ShiftWizardScreen> {
 
                 // ページ1から離れた場合のみ同期
                 if (wasOnDateSelection && page != 0) {
-                  print('   🔄 Triggering sync from page 0');
                   _syncDateSelectionToProvider();
                 }
               },
@@ -117,20 +88,7 @@ class _ShiftWizardScreenState extends ConsumerState<ShiftWizardScreen> {
                 // Page 1: 日付選択
                 _DateSelectionPage(
                   tempSelectedDates: _tempSelectedDates,
-                  selectedStoreId: _selectedStoreId,
                   focusedDay: _focusedDay,
-                  onStoreChanged: (storeId) {
-                    // 店舗切り替え前に、現在の一時選択をProviderに同期
-                    print('🏪 Store changing: $_selectedStoreId -> $storeId');
-                    _syncDateSelectionToProvider();
-
-                    setState(() {
-                      _selectedStoreId = storeId;
-                      // 新しい店舗用の一時選択をクリア
-                      _tempSelectedDates.clear();
-                      print('   ✅ Cleared temp selection for new store');
-                    });
-                  },
                   onFocusedDayChanged: (day) {
                     setState(() {
                       _focusedDay = day;
@@ -260,22 +218,18 @@ class _ShiftWizardScreenState extends ConsumerState<ShiftWizardScreen> {
 }
 
 // ============================================================
-// Page 1: 日付選択ページ
+// Page 1: 日付選択ページ（シンプル版）
 // ============================================================
 
 class _DateSelectionPage extends ConsumerStatefulWidget {
   final Set<DateTime> tempSelectedDates;
-  final String? selectedStoreId;
   final DateTime focusedDay;
-  final ValueChanged<String?> onStoreChanged;
   final ValueChanged<DateTime> onFocusedDayChanged;
   final VoidCallback onNext;
 
   const _DateSelectionPage({
     required this.tempSelectedDates,
-    required this.selectedStoreId,
     required this.focusedDay,
-    required this.onStoreChanged,
     required this.onFocusedDayChanged,
     required this.onNext,
   });
@@ -335,14 +289,7 @@ class _DateSelectionPageState extends ConsumerState<_DateSelectionPage> {
 
   bool _isSelected(DateTime day) {
     final normalized = _normalizeDate(day);
-
-    // Provider内にこの日付のシフトが存在するか、または一時選択されているか
-    final hasShiftInProvider = ref
-        .read(shiftDateProvider.notifier)
-        .getShiftCountForDate(day) > 0;
-    final isInTempSelection = widget.tempSelectedDates.contains(normalized);
-
-    return hasShiftInProvider || isInTempSelection;
+    return widget.tempSelectedDates.contains(normalized);
   }
 
   bool _isHoliday(DateTime day) {
@@ -360,109 +307,47 @@ class _DateSelectionPageState extends ConsumerState<_DateSelectionPage> {
     return !_isWeekendOrHoliday(day);
   }
 
+  // 日付の選択/解除（トグル）
   void _toggleDate(DateTime day) {
     final today = _normalizeDate(DateTime.now());
-    if (_normalizeDate(day).isBefore(today)) {
-      print('⛔ Past date rejected: $day');
-      return;
-    }
-
-    if (widget.selectedStoreId == null) {
-      print('⚠️ No store selected');
-      return;
-    }
+    if (_normalizeDate(day).isBefore(today)) return;
 
     setState(() {
       final normalized = _normalizeDate(day);
-      final dateString = '${normalized.year}-${normalized.month.toString().padLeft(2, '0')}-${normalized.day.toString().padLeft(2, '0')}';
-      final uniqueKey = '${dateString}_${widget.selectedStoreId}';
-
-      // 現在の店舗でこの日付のシフトが既にProviderに存在するかチェック
-      final existingShift = ref.read(shiftDateProvider).firstWhere(
-            (shift) => shift.uniqueKey == uniqueKey,
-            orElse: () => null as dynamic,
-          );
-
-      if (existingShift != null) {
-        // 既存のシフトを削除
-        ref.read(shiftDateProvider.notifier).removeDate(uniqueKey);
+      if (widget.tempSelectedDates.contains(normalized)) {
         widget.tempSelectedDates.remove(normalized);
-        print('➖ Removed shift: $uniqueKey from Provider');
       } else {
-        // 一時選択に追加（ページ移動時にProviderに同期される）
         widget.tempSelectedDates.add(normalized);
-        print('➕ Added date to temp: $normalized (total: ${widget.tempSelectedDates.length})');
       }
     });
   }
 
+  // 共通: 条件に合う日付をトグル選択
   void _toggleDatesWhere(bool Function(DateTime) condition) {
-    if (widget.selectedStoreId == null) {
-      print('⚠️ No store selected for batch operation');
-      return;
-    }
-
     setState(() {
       final dates = _getDatesInMonth(condition);
       final today = _normalizeDate(DateTime.now());
+
+      // 過去日付を除外（表示されている月でも過去は選択不可）
       final validDates = dates.where((d) => !d.isBefore(today)).toList();
 
       if (validDates.isEmpty) return;
 
-      // 現在の店舗で、これらの日付が全て選択済みか確認
-      final allSelected = validDates.every((date) {
-        final dateString =
-            '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
-        final uniqueKey = '${dateString}_${widget.selectedStoreId}';
-
-        // Providerに存在するか、または一時選択されているか
-        final existsInProvider = ref.read(shiftDateProvider).any(
-              (shift) => shift.uniqueKey == uniqueKey,
-            );
-        final isInTemp = widget.tempSelectedDates.contains(date);
-
-        return existsInProvider || isInTemp;
-      });
+      // 全部選択済みか確認
+      final allSelected =
+          validDates.every((d) => widget.tempSelectedDates.contains(d));
 
       if (allSelected) {
-        // 解除：Providerから削除 & 一時選択から削除
-        for (final date in validDates) {
-          final dateString =
-              '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
-          final uniqueKey = '${dateString}_${widget.selectedStoreId}';
-
-          // Providerから削除
-          final existsInProvider = ref.read(shiftDateProvider).any(
-                (shift) => shift.uniqueKey == uniqueKey,
-              );
-          if (existsInProvider) {
-            ref.read(shiftDateProvider.notifier).removeDate(uniqueKey);
-          }
-
-          // 一時選択から削除
-          widget.tempSelectedDates.remove(date);
-        }
-        print('➖ Batch removed ${validDates.length} dates');
+        // 解除
+        validDates.forEach(widget.tempSelectedDates.remove);
       } else {
-        // 選択：一時選択に追加（既にProviderにあるものは除外）
-        for (final date in validDates) {
-          final dateString =
-              '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
-          final uniqueKey = '${dateString}_${widget.selectedStoreId}';
-
-          final existsInProvider = ref.read(shiftDateProvider).any(
-                (shift) => shift.uniqueKey == uniqueKey,
-              );
-
-          if (!existsInProvider) {
-            widget.tempSelectedDates.add(date);
-          }
-        }
-        print('➕ Batch added ${validDates.length} dates to temp');
+        // 選択
+        widget.tempSelectedDates.addAll(validDates);
       }
     });
   }
 
+  // 共通: 月内の日付を取得
   List<DateTime> _getDatesInMonth(bool Function(DateTime) condition) {
     final firstDay =
         DateTime(widget.focusedDay.year, widget.focusedDay.month, 1);
@@ -503,30 +388,25 @@ class _DateSelectionPageState extends ConsumerState<_DateSelectionPage> {
 
   @override
   Widget build(BuildContext context) {
-    final stores = ref.watch(storeProvider);
-    final shiftDates = ref.watch(shiftDateProvider);
-
     return Scaffold(
       appBar: AppBar(
-        title: const Text('日付選択'),
+        title: const Text('出勤日を選択'),
         backgroundColor: Theme.of(context).colorScheme.inversePrimary,
         automaticallyImplyLeading: false,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.business),
-            onPressed: () => _showStoreManageDialog(context),
-            tooltip: '店舗管理',
-          ),
-        ],
       ),
       body: Column(
         children: [
-          _buildStoreSelector(stores),
-          const Divider(height: 1),
+          // アクションボタン（平日・全日・土日祝・クリア）
           _buildActionButtons(),
+
           const Divider(height: 1),
+
+          // 曜日別選択ボタン
           _buildWeekdayButtons(),
+
           const Divider(height: 1),
+
+          // カレンダー
           Expanded(
             child: TableCalendar(
               firstDay: DateTime.utc(2020, 1, 1),
@@ -544,7 +424,7 @@ class _DateSelectionPageState extends ConsumerState<_DateSelectionPage> {
                 widget.onFocusedDayChanged(focusedDay);
               },
               onPageChanged: (focusedDay) {
-                // 月が変わったらfocusedDayを更新（重要：これがないと翌月の一括選択が機能しない）
+                // 月が変わったらfocusedDayを更新
                 widget.onFocusedDayChanged(focusedDay);
               },
               headerStyle: const HeaderStyle(
@@ -556,19 +436,35 @@ class _DateSelectionPageState extends ConsumerState<_DateSelectionPage> {
                 ),
               ),
               calendarStyle: CalendarStyle(
+                // 今日
                 todayDecoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.primary.withOpacity(0.3),
+                  color: Colors.grey.withOpacity(0.3),
                   shape: BoxShape.circle,
                 ),
+                // 選択された日（緑色・四角形・リップルエフェクト風）
                 selectedDecoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.primary,
+                  color: Colors.green,
                   borderRadius: BorderRadius.circular(8),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.green.withOpacity(0.4),
+                      blurRadius: 8,
+                      spreadRadius: 2,
+                    ),
+                  ],
                 ),
+                selectedTextStyle: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
+                ),
+                // 土曜日（青）
                 weekendTextStyle: const TextStyle(
                   color: Colors.blue,
                   fontWeight: FontWeight.w600,
                 ),
                 outsideTextStyle: TextStyle(color: Colors.grey[400]),
+                // 祝日（ピンク）
                 holidayTextStyle: const TextStyle(
                   color: Colors.pink,
                   fontWeight: FontWeight.w600,
@@ -585,72 +481,39 @@ class _DateSelectionPageState extends ConsumerState<_DateSelectionPage> {
                 ),
               ),
               calendarBuilders: CalendarBuilders(
+                // 選択された日付のカスタム表示
                 selectedBuilder: (context, day, focusedDay) {
-                  final shifts =
-                      ref.read(shiftDateProvider.notifier).getShiftsForDate(day);
-                  final stores = ref.read(storeProvider);
-                  final dotColors = [
-                    Colors.red,
-                    Colors.blue,
-                    Colors.yellow,
-                    Colors.green,
-                  ];
-
                   return Center(
                     child: Container(
                       width: 40,
                       height: 40,
                       decoration: BoxDecoration(
-                        color: Theme.of(context).colorScheme.primary,
+                        color: Colors.green,
                         borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Text(
-                            '${day.day}',
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 16,
-                            ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.green.withOpacity(0.4),
+                            blurRadius: 8,
+                            spreadRadius: 2,
                           ),
-                          if (shifts.isNotEmpty) ...[
-                            const SizedBox(height: 2),
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: shifts.take(4).map((shift) {
-                                final storeIndex = stores.indexWhere(
-                                  (s) => s.id == shift.storeId,
-                                );
-                                final dotColor =
-                                    storeIndex >= 0 && storeIndex < 4
-                                        ? dotColors[storeIndex]
-                                        : Colors.white;
-
-                                return Container(
-                                  margin: const EdgeInsets.symmetric(
-                                      horizontal: 1),
-                                  width: 6,
-                                  height: 6,
-                                  decoration: BoxDecoration(
-                                    color: dotColor,
-                                    shape: BoxShape.circle,
-                                    border: Border.all(
-                                      color: Colors.white.withOpacity(0.5),
-                                      width: 0.5,
-                                    ),
-                                  ),
-                                );
-                              }).toList(),
-                            ),
-                          ],
                         ],
+                      ),
+                      child: Center(
+                        child: Text(
+                          '${day.day}',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                          ),
+                        ),
                       ),
                     ),
                   );
                 },
+                // デフォルトの日付表示をカスタマイズ
                 defaultBuilder: (context, day, focusedDay) {
+                  // 祝日をピンク色に
                   if (_isHoliday(day)) {
                     return Center(
                       child: Text(
@@ -662,6 +525,7 @@ class _DateSelectionPageState extends ConsumerState<_DateSelectionPage> {
                       ),
                     );
                   }
+                  // 日曜日を赤色に
                   if (day.weekday == DateTime.sunday) {
                     return Center(
                       child: Text(
@@ -673,6 +537,7 @@ class _DateSelectionPageState extends ConsumerState<_DateSelectionPage> {
                       ),
                     );
                   }
+                  // 土曜日を青色に
                   if (day.weekday == DateTime.saturday) {
                     return Center(
                       child: Text(
@@ -686,6 +551,7 @@ class _DateSelectionPageState extends ConsumerState<_DateSelectionPage> {
                   }
                   return null;
                 },
+                // 過去の日付を無効化
                 disabledBuilder: (context, day, focusedDay) {
                   return Center(
                     child: Text(
@@ -697,52 +563,24 @@ class _DateSelectionPageState extends ConsumerState<_DateSelectionPage> {
                     ),
                   );
                 },
-                markerBuilder: (context, day, events) {
-                  final count = ref
-                      .read(shiftDateProvider.notifier)
-                      .getShiftCountForDate(day);
-
-                  if (count == 0) return const SizedBox.shrink();
-
-                  return Positioned(
-                    bottom: 1,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 4,
-                        vertical: 1,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Colors.red,
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Text(
-                        '$count',
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 10,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                  );
-                },
               ),
             ),
           ),
+
           const Divider(height: 1),
+
+          // 選択数表示
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
             decoration: BoxDecoration(
               gradient: LinearGradient(
                 colors: [
-                  Theme.of(context).colorScheme.primaryContainer,
-                  Theme.of(context)
-                      .colorScheme
-                      .primaryContainer
-                      .withOpacity(0.7),
+                  Colors.green.shade100,
+                  Colors.green.shade50,
                 ],
               ),
-              border: const Border(top: BorderSide(color: Colors.grey, width: 1)),
+              border:
+                  const Border(top: BorderSide(color: Colors.grey, width: 1)),
             ),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
@@ -753,19 +591,19 @@ class _DateSelectionPageState extends ConsumerState<_DateSelectionPage> {
                     color: Colors.white,
                     shape: BoxShape.circle,
                   ),
-                  child: Icon(
+                  child: const Icon(
                     Icons.check_circle,
                     size: 20,
-                    color: Theme.of(context).colorScheme.primary,
+                    color: Colors.green,
                   ),
                 ),
                 const SizedBox(width: 12),
                 Text(
                   '選択: ${widget.tempSelectedDates.length}日',
-                  style: TextStyle(
+                  style: const TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
-                    color: Theme.of(context).colorScheme.onPrimaryContainer,
+                    color: Colors.black87,
                   ),
                 ),
               ],
@@ -776,104 +614,24 @@ class _DateSelectionPageState extends ConsumerState<_DateSelectionPage> {
     );
   }
 
-  Widget _buildStoreSelector(List<Store> stores) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.withOpacity(0.1),
-            spreadRadius: 1,
-            blurRadius: 3,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              const Icon(Icons.store, size: 20, color: Colors.grey),
-              const SizedBox(width: 8),
-              const Text(
-                '勤務先を選択',
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.black87,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              ...stores.map((store) {
-                final isSelected = widget.selectedStoreId == store.id;
-                return ChoiceChip(
-                  label: Text(store.name),
-                  selected: isSelected,
-                  onSelected: (selected) {
-                    if (selected) {
-                      widget.onStoreChanged(store.id);
-                    }
-                  },
-                  selectedColor: store.color,
-                  backgroundColor: store.color.withOpacity(0.15),
-                  side: BorderSide(
-                    color: isSelected
-                        ? store.color
-                        : store.color.withOpacity(0.3),
-                    width: 2,
-                  ),
-                  labelStyle: TextStyle(
-                    color: isSelected ? Colors.white : Colors.black87,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 13,
-                  ),
-                  elevation: isSelected ? 4 : 0,
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                );
-              }),
-              ActionChip(
-                avatar: const Icon(Icons.add, size: 18),
-                label: const Text(
-                  '店舗追加',
-                  style: TextStyle(fontWeight: FontWeight.bold),
-                ),
-                onPressed: () => _showAddStoreDialog(context),
-                elevation: 2,
-                backgroundColor: Colors.grey[100],
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
   Widget _buildWeekdayButtons() {
+    // 日曜日始まりに変更
     final weekdays = ['日', '月', '火', '水', '木', '金', '土'];
     final colors = [
-      Colors.red,
-      Colors.grey,
-      Colors.grey,
-      Colors.grey,
-      Colors.grey,
-      Colors.grey,
-      Colors.blue,
+      Colors.red, // 日
+      Colors.grey, // 月
+      Colors.grey, // 火
+      Colors.grey, // 水
+      Colors.grey, // 木
+      Colors.grey, // 金
+      Colors.blue, // 土
     ];
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       child: Row(
         children: List.generate(7, (index) {
+          // DateTime.sunday=7, Monday=1なので、日曜は7、月〜土は1〜6
           final weekday = index == 0 ? DateTime.sunday : index;
           return Expanded(
             child: Padding(
@@ -979,146 +737,6 @@ class _DateSelectionPageState extends ConsumerState<_DateSelectionPage> {
       ),
     );
   }
-
-  void _showAddStoreDialog(BuildContext context) {
-    final controller = TextEditingController();
-
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('店舗追加'),
-        content: TextField(
-          controller: controller,
-          decoration: const InputDecoration(
-            labelText: '店舗名',
-            border: OutlineInputBorder(),
-          ),
-          maxLength: 20,
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('キャンセル'),
-          ),
-          TextButton(
-            onPressed: () {
-              if (controller.text.isNotEmpty) {
-                final newStore =
-                    ref.read(storeProvider.notifier).addStore(controller.text);
-                widget.onStoreChanged(newStore.id);
-                Navigator.pop(context);
-              }
-            },
-            child: const Text('追加'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _showStoreManageDialog(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (context) => _StoreManageDialog(),
-    );
-  }
-}
-
-class _StoreManageDialog extends ConsumerWidget {
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final stores = ref.watch(storeProvider);
-
-    return AlertDialog(
-      title: const Text('店舗管理'),
-      content: SizedBox(
-        width: double.maxFinite,
-        child: ListView.builder(
-          shrinkWrap: true,
-          itemCount: stores.length,
-          itemBuilder: (context, index) {
-            final store = stores[index];
-            final isDefault = store.id == 'default';
-
-            return ListTile(
-              leading: CircleAvatar(
-                backgroundColor: store.color,
-                radius: 16,
-              ),
-              title: Text(store.name),
-              subtitle: isDefault ? const Text('デフォルト店舗') : null,
-              trailing: isDefault
-                  ? IconButton(
-                      icon: const Icon(Icons.edit),
-                      onPressed: () => _showEditStoreDialog(context, ref, store),
-                    )
-                  : Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        IconButton(
-                          icon: const Icon(Icons.edit),
-                          onPressed: () =>
-                              _showEditStoreDialog(context, ref, store),
-                        ),
-                        IconButton(
-                          icon: const Icon(Icons.delete),
-                          onPressed: () {
-                            ref
-                                .read(shiftDateProvider.notifier)
-                                .removeStore(store.id);
-                            ref.read(storeProvider.notifier).removeStore(store.id);
-                          },
-                        ),
-                      ],
-                    ),
-            );
-          },
-        ),
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: const Text('閉じる'),
-        ),
-      ],
-    );
-  }
-
-  void _showEditStoreDialog(BuildContext context, WidgetRef ref, Store store) {
-    final controller = TextEditingController(text: store.name);
-
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('店舗名変更'),
-        content: TextField(
-          controller: controller,
-          decoration: const InputDecoration(
-            labelText: '店舗名',
-            border: OutlineInputBorder(),
-          ),
-          maxLength: 20,
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('キャンセル'),
-          ),
-          TextButton(
-            onPressed: () {
-              if (controller.text.isNotEmpty) {
-                ref
-                    .read(storeProvider.notifier)
-                    .renameStore(store.id, controller.text);
-                Navigator.pop(context);
-              }
-            },
-            child: const Text('保存'),
-          ),
-        ],
-      ),
-    );
-  }
 }
 
 // ============================================================
@@ -1206,7 +824,7 @@ class _TimeSettingListPage extends ConsumerWidget {
                   elevation: 2,
                   child: ListTile(
                     leading: CircleAvatar(
-                      backgroundColor: store.color,
+                      backgroundColor: Colors.green,
                       child: Text(
                         shift.date.day.toString(),
                         style: const TextStyle(
@@ -1348,8 +966,7 @@ class _ConfirmationPage extends ConsumerWidget {
                       },
                       style: ElevatedButton.styleFrom(
                         padding: const EdgeInsets.symmetric(vertical: 16),
-                        backgroundColor:
-                            Theme.of(context).colorScheme.primary,
+                        backgroundColor: Colors.green,
                         minimumSize: const Size.fromHeight(50),
                       ),
                       child: const Text(
@@ -1417,12 +1034,12 @@ class _MonthAccordionState extends State<_MonthAccordion> {
 
               return ListTile(
                 dense: true,
-                leading: CircleAvatar(
-                  backgroundColor: store.color,
+                leading: const CircleAvatar(
+                  backgroundColor: Colors.green,
                   radius: 12,
                 ),
                 title: Text(
-                  '${shift.date.month}/${shift.date.day} (${store.name})',
+                  '${shift.date.month}/${shift.date.day}',
                   style: const TextStyle(fontSize: 14),
                 ),
                 subtitle: Text(
