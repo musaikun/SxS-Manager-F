@@ -430,6 +430,28 @@ class _DateSelectionPageState extends ConsumerState<_DateSelectionPage> {
     return validDates.every((d) => widget.tempSelectedDates.contains(d));
   }
 
+  // 該当日付のシフト情報を取得
+  String? _getTimeInfo(DateTime day) {
+    final normalized = _normalizeDate(day);
+    final shiftDates = ref.read(shiftDateProvider);
+
+    // 該当する日付のシフトを探す
+    for (final shift in shiftDates) {
+      final shiftDate = _normalizeDate(shift.date);
+      if (shiftDate == normalized) {
+        // 時間が設定されている場合のみ表示
+        if (shift.startTime != null && shift.endTime != null) {
+          // "HH:MM" から "HH" を抽出
+          final startHour = shift.startTime!.split(':')[0];
+          final endHour = shift.endTime!.split(':')[0];
+          return '$startHour-$endHour';
+        }
+        break;
+      }
+    }
+    return null;
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -539,6 +561,8 @@ class _DateSelectionPageState extends ConsumerState<_DateSelectionPage> {
               calendarBuilders: CalendarBuilders(
                 // 選択された日付のカスタム表示
                 selectedBuilder: (context, day, focusedDay) {
+                  final timeInfo = _getTimeInfo(day);
+
                   return Center(
                     child: Container(
                       width: 40,
@@ -554,67 +578,155 @@ class _DateSelectionPageState extends ConsumerState<_DateSelectionPage> {
                           ),
                         ],
                       ),
-                      child: Center(
-                        child: Text(
-                          '${day.day}',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 16,
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          if (timeInfo != null) ...[
+                            Text(
+                              timeInfo,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 8,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                          ],
+                          Text(
+                            '${day.day}',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 16,
+                            ),
                           ),
-                        ),
+                        ],
+                      ),
+                    ),
+                  );
+                },
+                // 今日の日付表示
+                todayBuilder: (context, day, focusedDay) {
+                  Color textColor = Colors.black;
+                  final timeInfo = _getTimeInfo(day);
+
+                  // 祝日はピンク色
+                  if (_isHoliday(day)) {
+                    textColor = Colors.pink;
+                  }
+                  // 日曜日は赤色
+                  else if (day.weekday == DateTime.sunday) {
+                    textColor = Colors.red;
+                  }
+                  // 土曜日は青色
+                  else if (day.weekday == DateTime.saturday) {
+                    textColor = Colors.blue;
+                  }
+
+                  return Center(
+                    child: Container(
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        color: Colors.grey[200],
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          if (timeInfo != null) ...[
+                            Text(
+                              timeInfo,
+                              style: TextStyle(
+                                color: textColor,
+                                fontSize: 8,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                          ],
+                          Text(
+                            '${day.day}',
+                            style: TextStyle(
+                              color: textColor,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   );
                 },
                 // デフォルトの日付表示をカスタマイズ
                 defaultBuilder: (context, day, focusedDay) {
-                  // 祝日をピンク色に
+                  Color textColor = Colors.black;
+                  final timeInfo = _getTimeInfo(day);
+
+                  // 祝日はピンク色
                   if (_isHoliday(day)) {
-                    return Center(
-                      child: Text(
-                        '${day.day}',
-                        style: const TextStyle(
-                          color: Colors.pink,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    );
+                    textColor = Colors.pink;
                   }
-                  // 日曜日を赤色に
-                  if (day.weekday == DateTime.sunday) {
-                    return Center(
-                      child: Text(
-                        '${day.day}',
-                        style: const TextStyle(
-                          color: Colors.red,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    );
+                  // 日曜日は赤色
+                  else if (day.weekday == DateTime.sunday) {
+                    textColor = Colors.red;
                   }
-                  // 土曜日を青色に
-                  if (day.weekday == DateTime.saturday) {
-                    return Center(
-                      child: Text(
-                        '${day.day}',
-                        style: const TextStyle(
-                          color: Colors.blue,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    );
+                  // 土曜日は青色
+                  else if (day.weekday == DateTime.saturday) {
+                    textColor = Colors.blue;
                   }
-                  return null;
+
+                  return Center(
+                    child: Container(
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        color: Colors.grey[200],
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          if (timeInfo != null) ...[
+                            Text(
+                              timeInfo,
+                              style: TextStyle(
+                                color: textColor,
+                                fontSize: 8,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                          ],
+                          Text(
+                            '${day.day}',
+                            style: TextStyle(
+                              color: textColor,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
                 },
                 // 過去の日付を無効化
                 disabledBuilder: (context, day, focusedDay) {
                   return Center(
-                    child: Text(
-                      '${day.day}',
-                      style: TextStyle(
-                        color: Colors.grey[400],
-                        fontWeight: FontWeight.w400,
+                    child: Container(
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        color: Colors.grey[200],
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Center(
+                        child: Text(
+                          '${day.day}',
+                          style: TextStyle(
+                            color: Colors.grey[400],
+                            fontWeight: FontWeight.w400,
+                          ),
+                        ),
                       ),
                     ),
                   );
@@ -1286,7 +1398,7 @@ class _TimeSettingListPageState extends ConsumerState<_TimeSettingListPage> {
 
                 // 一括設定モード時のボタン
                 if (_isSelectionMode) ...[
-                  // 全選択と時間設定ボタン
+                  // 全選択、クリア、時間設定ボタン
                   Padding(
                     padding: const EdgeInsets.all(12),
                     child: Row(
@@ -1309,7 +1421,31 @@ class _TimeSettingListPageState extends ConsumerState<_TimeSettingListPage> {
                                     shiftDates.length
                                 ? Icons.check_box
                                 : Icons.check_box_outline_blank),
-                            label: const Text('全選択'),
+                            label: const Text('全選択', style: TextStyle(fontSize: 12)),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed: _selectedUniqueKeys.isEmpty
+                                ? null
+                                : () {
+                                    setState(() {
+                                      _selectedUniqueKeys.clear();
+                                    });
+                                  },
+                            icon: const Icon(Icons.clear, size: 16),
+                            label: const Text('クリア', style: TextStyle(fontSize: 12)),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: _selectedUniqueKeys.isEmpty
+                                  ? null
+                                  : Colors.red,
+                              side: BorderSide(
+                                color: _selectedUniqueKeys.isEmpty
+                                    ? Colors.grey
+                                    : Colors.red,
+                              ),
+                            ),
                           ),
                         ),
                         const SizedBox(width: 8),
@@ -1319,9 +1455,10 @@ class _TimeSettingListPageState extends ConsumerState<_TimeSettingListPage> {
                             onPressed: _selectedUniqueKeys.isEmpty
                                 ? null
                                 : _showBatchTimeSettingDialog,
-                            icon: const Icon(Icons.access_time),
+                            icon: const Icon(Icons.access_time, size: 16),
                             label: Text(
-                                '時間設定 (${_selectedUniqueKeys.length})'),
+                                '時間設定 (${_selectedUniqueKeys.length})',
+                                style: const TextStyle(fontSize: 12)),
                             style: ElevatedButton.styleFrom(
                               backgroundColor: Colors.green,
                               foregroundColor: Colors.white,
