@@ -35,20 +35,38 @@ class _ShiftWizardScreenState extends ConsumerState<ShiftWizardScreen> {
   void _syncDateSelectionToProvider() {
     // デフォルト店舗を取得
     final defaultStore = ref.read(defaultStoreProvider);
-
-    // 重要：現在Providerにあるデフォルト店舗のシフトを全削除
     final currentShifts = ref.read(shiftDateProvider);
-    for (final shift in currentShifts.toList()) {
+
+    // 既存のシフト（デフォルト店舗のみ）の日付と時間情報をマップで保持
+    final Map<DateTime, dynamic> existingShifts = {};
+    for (final shift in currentShifts) {
       if (shift.storeId == defaultStore.id) {
-        ref.read(shiftDateProvider.notifier).removeDate(shift.uniqueKey);
+        final normalized = _normalizeDate(shift.date);
+        existingShifts[normalized] = shift;
       }
     }
 
-    // _tempSelectedDatesの内容を新規登録
-    if (_tempSelectedDates.isNotEmpty) {
+    // 削除すべき日付を特定（既存にあるが_tempSelectedDatesにない）
+    final datesToRemove = existingShifts.keys
+        .where((date) => !_tempSelectedDates.contains(date))
+        .toList();
+
+    // 追加すべき日付を特定（_tempSelectedDatesにあるが既存にない）
+    final datesToAdd = _tempSelectedDates
+        .where((date) => !existingShifts.containsKey(date))
+        .toList();
+
+    // 削除
+    for (final date in datesToRemove) {
+      final shift = existingShifts[date]!;
+      ref.read(shiftDateProvider.notifier).removeDate(shift.uniqueKey);
+    }
+
+    // 追加（新規シフトのみ、既存のシフトの時間情報は保持される）
+    if (datesToAdd.isNotEmpty) {
       ref
           .read(shiftDateProvider.notifier)
-          .addDates(_tempSelectedDates.toList(), defaultStore.id);
+          .addDates(datesToAdd.toList(), defaultStore.id);
     }
   }
 

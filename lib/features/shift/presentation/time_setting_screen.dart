@@ -126,6 +126,187 @@ class _TimeSettingScreenState extends ConsumerState<TimeSettingScreen> {
     return '$hours時間${minutes > 0 ? "$minutes分" : ""}';
   }
 
+  // 時間設定ダイアログを表示
+  void _showTimeSettingDialog() {
+    TimeOfDay? tempStartTime = _startTime;
+    TimeOfDay? tempEndTime = _endTime;
+
+    showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const Text('勤務時間設定'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // 開始時刻
+              ListTile(
+                leading: const Icon(Icons.login, color: Colors.green),
+                title: const Text('開始時刻'),
+                trailing: Text(
+                  tempStartTime?.format(context) ?? '未設定',
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                onTap: () async {
+                  final picked = await showTimePicker(
+                    context: context,
+                    initialTime:
+                        tempStartTime ?? const TimeOfDay(hour: 9, minute: 0),
+                  );
+                  if (picked != null) {
+                    setDialogState(() {
+                      tempStartTime = picked;
+                    });
+                  }
+                },
+              ),
+              const Divider(),
+              // 終了時刻
+              ListTile(
+                leading: const Icon(Icons.logout, color: Colors.red),
+                title: const Text('終了時刻'),
+                trailing: Text(
+                  tempEndTime?.format(context) ?? '未設定',
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                onTap: () async {
+                  final picked = await showTimePicker(
+                    context: context,
+                    initialTime:
+                        tempEndTime ?? const TimeOfDay(hour: 18, minute: 0),
+                  );
+                  if (picked != null) {
+                    setDialogState(() {
+                      tempEndTime = picked;
+                    });
+                  }
+                },
+              ),
+              const SizedBox(height: 16),
+              // クイック設定
+              const Text(
+                'クイック設定',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  _buildDialogQuickSetButton(
+                    setDialogState,
+                    (start, end) {
+                      tempStartTime = start;
+                      tempEndTime = end;
+                    },
+                    '9:00-18:00',
+                    9,
+                    0,
+                    18,
+                    0,
+                  ),
+                  _buildDialogQuickSetButton(
+                    setDialogState,
+                    (start, end) {
+                      tempStartTime = start;
+                      tempEndTime = end;
+                    },
+                    '10:00-19:00',
+                    10,
+                    0,
+                    19,
+                    0,
+                  ),
+                  _buildDialogQuickSetButton(
+                    setDialogState,
+                    (start, end) {
+                      tempStartTime = start;
+                      tempEndTime = end;
+                    },
+                    '13:00-22:00',
+                    13,
+                    0,
+                    22,
+                    0,
+                  ),
+                  _buildDialogQuickSetButton(
+                    setDialogState,
+                    (start, end) {
+                      tempStartTime = start;
+                      tempEndTime = end;
+                    },
+                    '17:00-23:00',
+                    17,
+                    0,
+                    23,
+                    0,
+                  ),
+                ],
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('キャンセル'),
+            ),
+            TextButton(
+              onPressed: () {
+                if (tempStartTime != null && tempEndTime != null) {
+                  setState(() {
+                    _startTime = tempStartTime;
+                    _endTime = tempEndTime;
+                  });
+                  Navigator.pop(context);
+                } else {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('開始時刻と終了時刻を設定してください')),
+                  );
+                }
+              },
+              child: const Text('設定'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ダイアログ用クイック設定ボタン
+  Widget _buildDialogQuickSetButton(
+    StateSetter setDialogState,
+    Function(TimeOfDay, TimeOfDay) onSet,
+    String label,
+    int startHour,
+    int startMinute,
+    int endHour,
+    int endMinute,
+  ) {
+    return OutlinedButton(
+      onPressed: () {
+        setDialogState(() {
+          onSet(
+            TimeOfDay(hour: startHour, minute: startMinute),
+            TimeOfDay(hour: endHour, minute: endMinute),
+          );
+        });
+      },
+      style: OutlinedButton.styleFrom(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      ),
+      child: Text(label, style: const TextStyle(fontSize: 12)),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     // uniqueKeyから日付を抽出（形式: "2025-01-15_storeId"）
@@ -196,61 +377,106 @@ class _TimeSettingScreenState extends ConsumerState<TimeSettingScreen> {
 
             const SizedBox(height: 24),
 
-            // 開始時刻
+            // 時間設定カード（1つのカードで両方設定）
             Card(
-              child: ListTile(
-                leading: const Icon(Icons.login, color: Colors.green),
-                title: const Text('開始時刻'),
-                subtitle: _startTime != null
-                    ? null
-                    : const Text('タップして設定', style: TextStyle(fontSize: 12)),
-                trailing: Text(
-                  _startTime?.format(context) ?? '--:--',
-                  style: const TextStyle(
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
+              child: InkWell(
+                onTap: _showTimeSettingDialog,
+                borderRadius: BorderRadius.circular(12),
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          const Icon(Icons.access_time, color: Colors.blue),
+                          const SizedBox(width: 8),
+                          const Text(
+                            '勤務時間',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          const Spacer(),
+                          if (_startTime == null || _endTime == null)
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 4,
+                              ),
+                              decoration: BoxDecoration(
+                                color: Colors.orange[100],
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Text(
+                                'タップして設定',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.orange[800],
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text(
+                                  '開始',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: Colors.grey,
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  _startTime?.format(context) ?? '--:--',
+                                  style: const TextStyle(
+                                    fontSize: 28,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const Icon(
+                            Icons.arrow_forward,
+                            size: 32,
+                            color: Colors.grey,
+                          ),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.end,
+                              children: [
+                                const Text(
+                                  '終了',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: Colors.grey,
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  _endTime?.format(context) ?? '--:--',
+                                  style: const TextStyle(
+                                    fontSize: 28,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
                   ),
                 ),
-                onTap: () async {
-                  final picked = await showTimePicker(
-                    context: context,
-                    initialTime:
-                        _startTime ?? const TimeOfDay(hour: 9, minute: 0),
-                  );
-                  if (picked != null) {
-                    setState(() => _startTime = picked);
-                  }
-                },
-              ),
-            ),
-
-            const SizedBox(height: 12),
-
-            // 終了時刻
-            Card(
-              child: ListTile(
-                leading: const Icon(Icons.logout, color: Colors.red),
-                title: const Text('終了時刻'),
-                subtitle: _endTime != null
-                    ? null
-                    : const Text('タップして設定', style: TextStyle(fontSize: 12)),
-                trailing: Text(
-                  _endTime?.format(context) ?? '--:--',
-                  style: const TextStyle(
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                onTap: () async {
-                  final picked = await showTimePicker(
-                    context: context,
-                    initialTime:
-                        _endTime ?? const TimeOfDay(hour: 18, minute: 0),
-                  );
-                  if (picked != null) {
-                    setState(() => _endTime = picked);
-                  }
-                },
               ),
             ),
 
