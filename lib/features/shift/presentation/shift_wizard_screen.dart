@@ -31,6 +31,10 @@ class _ShiftWizardScreenState extends ConsumerState<ShiftWizardScreen> {
     super.dispose();
   }
 
+  DateTime _normalizeDate(DateTime date) {
+    return DateTime.utc(date.year, date.month, date.day);
+  }
+
   // ページ変更時の処理（重要：状態同期）
   void _syncDateSelectionToProvider() {
     // デフォルト店舗を取得
