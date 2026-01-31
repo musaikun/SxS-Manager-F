@@ -394,6 +394,42 @@ class _DateSelectionPageState extends ConsumerState<_DateSelectionPage> {
     });
   }
 
+  // 該当する曜日が全て選択されているかチェック
+  bool _isWeekdayFullySelected(int weekday) {
+    final dates = _getDatesInMonth((day) => day.weekday == weekday);
+    final today = _normalizeDate(DateTime.now());
+    final validDates = dates.where((d) => !d.isBefore(today)).toList();
+    if (validDates.isEmpty) return false;
+    return validDates.every((d) => widget.tempSelectedDates.contains(d));
+  }
+
+  // 平日が全て選択されているかチェック
+  bool _isWeekdaysFullySelected() {
+    final dates = _getDatesInMonth(_isWeekday);
+    final today = _normalizeDate(DateTime.now());
+    final validDates = dates.where((d) => !d.isBefore(today)).toList();
+    if (validDates.isEmpty) return false;
+    return validDates.every((d) => widget.tempSelectedDates.contains(d));
+  }
+
+  // 土日祝が全て選択されているかチェック
+  bool _isWeekendsAndHolidaysFullySelected() {
+    final dates = _getDatesInMonth(_isWeekendOrHoliday);
+    final today = _normalizeDate(DateTime.now());
+    final validDates = dates.where((d) => !d.isBefore(today)).toList();
+    if (validDates.isEmpty) return false;
+    return validDates.every((d) => widget.tempSelectedDates.contains(d));
+  }
+
+  // 全日が選択されているかチェック
+  bool _isAllDaysFullySelected() {
+    final dates = _getDatesInMonth((day) => true);
+    final today = _normalizeDate(DateTime.now());
+    final validDates = dates.where((d) => !d.isBefore(today)).toList();
+    if (validDates.isEmpty) return false;
+    return validDates.every((d) => widget.tempSelectedDates.contains(d));
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -449,9 +485,9 @@ class _DateSelectionPageState extends ConsumerState<_DateSelectionPage> {
                   color: Colors.grey[200],
                   borderRadius: BorderRadius.circular(8),
                 ),
-                // 今日
+                // 今日（他の日と同じ薄いグレー）
                 todayDecoration: BoxDecoration(
-                  color: Colors.grey.withOpacity(0.3),
+                  color: Colors.grey[200],
                   borderRadius: BorderRadius.circular(8),
                 ),
                 // 選択された日（緑色・四角形・リップルエフェクト風）
@@ -653,6 +689,8 @@ class _DateSelectionPageState extends ConsumerState<_DateSelectionPage> {
         children: List.generate(7, (index) {
           // DateTime.sunday=7, Monday=1なので、日曜は7、月〜土は1〜6
           final weekday = index == 0 ? DateTime.sunday : index;
+          final isFullySelected = _isWeekdayFullySelected(weekday);
+
           return Expanded(
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 2),
@@ -660,14 +698,15 @@ class _DateSelectionPageState extends ConsumerState<_DateSelectionPage> {
                 onPressed: () => _toggleWeekday(weekday),
                 style: OutlinedButton.styleFrom(
                   padding: const EdgeInsets.symmetric(vertical: 6),
-                  side: BorderSide(color: colors[index]),
+                  side: BorderSide(color: isFullySelected ? Colors.green : colors[index]),
+                  backgroundColor: isFullySelected ? Colors.green : null,
                   minimumSize: const Size(0, 0),
                 ),
                 child: Text(
                   weekdays[index],
                   style: TextStyle(
                     fontSize: 12,
-                    color: colors[index],
+                    color: isFullySelected ? Colors.white : colors[index],
                     fontWeight: FontWeight.bold,
                   ),
                 ),
@@ -680,6 +719,10 @@ class _DateSelectionPageState extends ConsumerState<_DateSelectionPage> {
   }
 
   Widget _buildActionButtons() {
+    final isWeekdaysSelected = _isWeekdaysFullySelected();
+    final isAllDaysSelected = _isAllDaysFullySelected();
+    final isWeekendsSelected = _isWeekendsAndHolidaysFullySelected();
+
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
@@ -696,6 +739,8 @@ class _DateSelectionPageState extends ConsumerState<_DateSelectionPage> {
               style: ElevatedButton.styleFrom(
                 padding: const EdgeInsets.symmetric(vertical: 12),
                 elevation: 2,
+                backgroundColor: isWeekdaysSelected ? Colors.green : null,
+                foregroundColor: isWeekdaysSelected ? Colors.white : null,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(8),
                 ),
@@ -712,6 +757,8 @@ class _DateSelectionPageState extends ConsumerState<_DateSelectionPage> {
               style: ElevatedButton.styleFrom(
                 padding: const EdgeInsets.symmetric(vertical: 12),
                 elevation: 2,
+                backgroundColor: isAllDaysSelected ? Colors.green : null,
+                foregroundColor: isAllDaysSelected ? Colors.white : null,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(8),
                 ),
@@ -728,6 +775,8 @@ class _DateSelectionPageState extends ConsumerState<_DateSelectionPage> {
               style: ElevatedButton.styleFrom(
                 padding: const EdgeInsets.symmetric(vertical: 12),
                 elevation: 2,
+                backgroundColor: isWeekendsSelected ? Colors.green : null,
+                foregroundColor: isWeekendsSelected ? Colors.white : null,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(8),
                 ),
@@ -922,6 +971,50 @@ class _TimeSettingListPageState extends ConsumerState<_TimeSettingListPage> {
         _selectedUniqueKeys.addAll(keys);
       }
     });
+  }
+
+  // 該当する曜日が全て選択されているかチェック
+  bool _isWeekdayFullySelected(int weekday) {
+    final shiftDates = ref.read(shiftDateProvider);
+    final keys = shiftDates
+        .where((shift) => shift.date.weekday == weekday)
+        .map((s) => s.uniqueKey)
+        .toList();
+    if (keys.isEmpty) return false;
+    return keys.every((k) => _selectedUniqueKeys.contains(k));
+  }
+
+  // 平日が全て選択されているかチェック
+  bool _isWeekdaysFullySelected() {
+    final shiftDates = ref.read(shiftDateProvider);
+    final keys = shiftDates
+        .where((shift) => _isWeekday(shift.date))
+        .map((s) => s.uniqueKey)
+        .toList();
+    if (keys.isEmpty) return false;
+    return keys.every((k) => _selectedUniqueKeys.contains(k));
+  }
+
+  // 土日祝が全て選択されているかチェック
+  bool _isWeekendsAndHolidaysFullySelected() {
+    final shiftDates = ref.read(shiftDateProvider);
+    final keys = shiftDates
+        .where((shift) => _isWeekendOrHoliday(shift.date))
+        .map((s) => s.uniqueKey)
+        .toList();
+    if (keys.isEmpty) return false;
+    return keys.every((k) => _selectedUniqueKeys.contains(k));
+  }
+
+  // 第〇週が全て選択されているかチェック
+  bool _isWeekOfMonthFullySelected(int week) {
+    final shiftDates = ref.read(shiftDateProvider);
+    final keys = shiftDates
+        .where((shift) => _getWeekOfMonth(shift.date) == week)
+        .map((s) => s.uniqueKey)
+        .toList();
+    if (keys.isEmpty) return false;
+    return keys.every((k) => _selectedUniqueKeys.contains(k));
   }
 
   // 勤務時間を計算（時間単位）
@@ -1284,6 +1377,17 @@ class _TimeSettingListPageState extends ConsumerState<_TimeSettingListPage> {
                                 style: TextStyle(fontSize: 12)),
                             style: OutlinedButton.styleFrom(
                               padding: const EdgeInsets.symmetric(vertical: 8),
+                              backgroundColor: _isWeekdaysFullySelected()
+                                  ? Colors.green
+                                  : null,
+                              foregroundColor: _isWeekdaysFullySelected()
+                                  ? Colors.white
+                                  : null,
+                              side: BorderSide(
+                                color: _isWeekdaysFullySelected()
+                                    ? Colors.green
+                                    : Colors.grey,
+                              ),
                             ),
                           ),
                         ),
@@ -1296,6 +1400,19 @@ class _TimeSettingListPageState extends ConsumerState<_TimeSettingListPage> {
                                 style: TextStyle(fontSize: 12)),
                             style: OutlinedButton.styleFrom(
                               padding: const EdgeInsets.symmetric(vertical: 8),
+                              backgroundColor:
+                                  _isWeekendsAndHolidaysFullySelected()
+                                      ? Colors.green
+                                      : null,
+                              foregroundColor:
+                                  _isWeekendsAndHolidaysFullySelected()
+                                      ? Colors.white
+                                      : null,
+                              side: BorderSide(
+                                color: _isWeekendsAndHolidaysFullySelected()
+                                    ? Colors.green
+                                    : Colors.grey,
+                              ),
                             ),
                           ),
                         ),
@@ -1462,6 +1579,8 @@ class _TimeSettingListPageState extends ConsumerState<_TimeSettingListPage> {
   }
 
   Widget _buildWeekdayButton(String label, int weekday, Color color) {
+    final isFullySelected = _isWeekdayFullySelected(weekday);
+
     return Expanded(
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 2),
@@ -1469,14 +1588,15 @@ class _TimeSettingListPageState extends ConsumerState<_TimeSettingListPage> {
           onPressed: () => _selectByWeekday(weekday),
           style: OutlinedButton.styleFrom(
             padding: const EdgeInsets.symmetric(vertical: 6),
-            side: BorderSide(color: color),
+            side: BorderSide(color: isFullySelected ? Colors.green : color),
+            backgroundColor: isFullySelected ? Colors.green : null,
             minimumSize: const Size(0, 0),
           ),
           child: Text(
             label,
             style: TextStyle(
               fontSize: 12,
-              color: color,
+              color: isFullySelected ? Colors.white : color,
               fontWeight: FontWeight.bold,
             ),
           ),
@@ -1486,6 +1606,8 @@ class _TimeSettingListPageState extends ConsumerState<_TimeSettingListPage> {
   }
 
   Widget _buildWeekButton(String label, int week) {
+    final isFullySelected = _isWeekOfMonthFullySelected(week);
+
     return Expanded(
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 2),
@@ -1493,12 +1615,17 @@ class _TimeSettingListPageState extends ConsumerState<_TimeSettingListPage> {
           onPressed: () => _selectByWeekOfMonth(week),
           style: OutlinedButton.styleFrom(
             padding: const EdgeInsets.symmetric(vertical: 6),
+            side: BorderSide(
+              color: isFullySelected ? Colors.green : Colors.grey,
+            ),
+            backgroundColor: isFullySelected ? Colors.green : null,
             minimumSize: const Size(0, 0),
           ),
           child: Text(
             label,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 11,
+              color: isFullySelected ? Colors.white : Colors.black,
               fontWeight: FontWeight.bold,
             ),
           ),
