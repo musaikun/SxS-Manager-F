@@ -444,10 +444,15 @@ class _DateSelectionPageState extends ConsumerState<_DateSelectionPage> {
                 ),
               ),
               calendarStyle: CalendarStyle(
+                // デフォルト（薄いグレーの背景）
+                defaultDecoration: BoxDecoration(
+                  color: Colors.grey[200],
+                  borderRadius: BorderRadius.circular(8),
+                ),
                 // 今日
                 todayDecoration: BoxDecoration(
                   color: Colors.grey.withOpacity(0.3),
-                  shape: BoxShape.circle,
+                  borderRadius: BorderRadius.circular(8),
                 ),
                 // 選択された日（緑色・四角形・リップルエフェクト風）
                 selectedDecoration: BoxDecoration(
@@ -471,14 +476,21 @@ class _DateSelectionPageState extends ConsumerState<_DateSelectionPage> {
                   color: Colors.blue,
                   fontWeight: FontWeight.w600,
                 ),
+                // 土日も薄いグレーの背景
+                weekendDecoration: BoxDecoration(
+                  color: Colors.grey[200],
+                  borderRadius: BorderRadius.circular(8),
+                ),
                 outsideTextStyle: TextStyle(color: Colors.grey[400]),
                 // 祝日（ピンク）
                 holidayTextStyle: const TextStyle(
                   color: Colors.pink,
                   fontWeight: FontWeight.w600,
                 ),
-                holidayDecoration: const BoxDecoration(
-                  shape: BoxShape.circle,
+                // 祝日も薄いグレーの背景
+                holidayDecoration: BoxDecoration(
+                  color: Colors.grey[200],
+                  borderRadius: BorderRadius.circular(8),
                 ),
               ),
               daysOfWeekStyle: DaysOfWeekStyle(
@@ -769,6 +781,149 @@ class _TimeSettingListPageState extends ConsumerState<_TimeSettingListPage> {
   final Set<String> _selectedUniqueKeys = {};
   bool _isSelectionMode = false;
 
+  // 2025-2026年の祝日リスト（日本）
+  final Map<DateTime, String> _holidays = {
+    DateTime.utc(2025, 1, 1): '元日',
+    DateTime.utc(2025, 1, 13): '成人の日',
+    DateTime.utc(2025, 2, 11): '建国記念の日',
+    DateTime.utc(2025, 2, 23): '天皇誕生日',
+    DateTime.utc(2025, 2, 24): '振替休日',
+    DateTime.utc(2025, 3, 20): '春分の日',
+    DateTime.utc(2025, 4, 29): '昭和の日',
+    DateTime.utc(2025, 5, 3): '憲法記念日',
+    DateTime.utc(2025, 5, 4): 'みどりの日',
+    DateTime.utc(2025, 5, 5): 'こどもの日',
+    DateTime.utc(2025, 5, 6): '振替休日',
+    DateTime.utc(2025, 7, 21): '海の日',
+    DateTime.utc(2025, 8, 11): '山の日',
+    DateTime.utc(2025, 9, 15): '敬老の日',
+    DateTime.utc(2025, 9, 23): '秋分の日',
+    DateTime.utc(2025, 10, 13): 'スポーツの日',
+    DateTime.utc(2025, 11, 3): '文化の日',
+    DateTime.utc(2025, 11, 23): '勤労感謝の日',
+    DateTime.utc(2025, 11, 24): '振替休日',
+    DateTime.utc(2026, 1, 1): '元日',
+    DateTime.utc(2026, 1, 12): '成人の日',
+    DateTime.utc(2026, 2, 11): '建国記念の日',
+    DateTime.utc(2026, 2, 23): '天皇誕生日',
+    DateTime.utc(2026, 3, 20): '春分の日',
+    DateTime.utc(2026, 4, 29): '昭和の日',
+    DateTime.utc(2026, 5, 3): '憲法記念日',
+    DateTime.utc(2026, 5, 4): 'みどりの日',
+    DateTime.utc(2026, 5, 5): 'こどもの日',
+    DateTime.utc(2026, 5, 6): '振替休日',
+    DateTime.utc(2026, 7, 20): '海の日',
+    DateTime.utc(2026, 8, 11): '山の日',
+    DateTime.utc(2026, 9, 21): '敬老の日',
+    DateTime.utc(2026, 9, 22): '国民の休日',
+    DateTime.utc(2026, 9, 23): '秋分の日',
+    DateTime.utc(2026, 10, 12): 'スポーツの日',
+    DateTime.utc(2026, 11, 3): '文化の日',
+    DateTime.utc(2026, 11, 23): '勤労感謝の日',
+  };
+
+  DateTime _normalizeDate(DateTime date) {
+    return DateTime.utc(date.year, date.month, date.day);
+  }
+
+  bool _isHoliday(DateTime day) {
+    final normalized = _normalizeDate(day);
+    return _holidays.containsKey(normalized);
+  }
+
+  bool _isWeekendOrHoliday(DateTime day) {
+    return day.weekday == DateTime.saturday ||
+        day.weekday == DateTime.sunday ||
+        _isHoliday(day);
+  }
+
+  bool _isWeekday(DateTime day) {
+    return !_isWeekendOrHoliday(day);
+  }
+
+  // 日付が第何週かを計算（1-5）
+  int _getWeekOfMonth(DateTime date) {
+    final firstDayOfMonth = DateTime(date.year, date.month, 1);
+    final daysSinceFirstDay = date.difference(firstDayOfMonth).inDays;
+    return (daysSinceFirstDay / 7).floor() + 1;
+  }
+
+  // 曜日別選択
+  void _selectByWeekday(int weekday) {
+    setState(() {
+      final shiftDates = ref.read(shiftDateProvider);
+      final keys = shiftDates
+          .where((shift) => shift.date.weekday == weekday)
+          .map((s) => s.uniqueKey)
+          .toList();
+
+      // トグル動作
+      final allSelected = keys.every((k) => _selectedUniqueKeys.contains(k));
+      if (allSelected) {
+        _selectedUniqueKeys.removeAll(keys);
+      } else {
+        _selectedUniqueKeys.addAll(keys);
+      }
+    });
+  }
+
+  // 平日のみ選択
+  void _selectWeekdays() {
+    setState(() {
+      final shiftDates = ref.read(shiftDateProvider);
+      final keys = shiftDates
+          .where((shift) => _isWeekday(shift.date))
+          .map((s) => s.uniqueKey)
+          .toList();
+
+      // トグル動作
+      final allSelected = keys.every((k) => _selectedUniqueKeys.contains(k));
+      if (allSelected) {
+        _selectedUniqueKeys.removeAll(keys);
+      } else {
+        _selectedUniqueKeys.addAll(keys);
+      }
+    });
+  }
+
+  // 土日祝日選択
+  void _selectWeekendsAndHolidays() {
+    setState(() {
+      final shiftDates = ref.read(shiftDateProvider);
+      final keys = shiftDates
+          .where((shift) => _isWeekendOrHoliday(shift.date))
+          .map((s) => s.uniqueKey)
+          .toList();
+
+      // トグル動作
+      final allSelected = keys.every((k) => _selectedUniqueKeys.contains(k));
+      if (allSelected) {
+        _selectedUniqueKeys.removeAll(keys);
+      } else {
+        _selectedUniqueKeys.addAll(keys);
+      }
+    });
+  }
+
+  // 第〇週選択
+  void _selectByWeekOfMonth(int week) {
+    setState(() {
+      final shiftDates = ref.read(shiftDateProvider);
+      final keys = shiftDates
+          .where((shift) => _getWeekOfMonth(shift.date) == week)
+          .map((s) => s.uniqueKey)
+          .toList();
+
+      // トグル動作
+      final allSelected = keys.every((k) => _selectedUniqueKeys.contains(k));
+      if (allSelected) {
+        _selectedUniqueKeys.removeAll(keys);
+      } else {
+        _selectedUniqueKeys.addAll(keys);
+      }
+    });
+  }
+
   // 勤務時間を計算（時間単位）
   double? _calculateWorkHours(String? startTime, String? endTime) {
     if (startTime == null || endTime == null) return null;
@@ -1037,7 +1192,8 @@ class _TimeSettingListPageState extends ConsumerState<_TimeSettingListPage> {
                   ),
 
                 // 一括設定モード時のボタン
-                if (_isSelectionMode)
+                if (_isSelectionMode) ...[
+                  // 全選択と時間設定ボタン
                   Padding(
                     padding: const EdgeInsets.all(12),
                     child: Row(
@@ -1082,6 +1238,103 @@ class _TimeSettingListPageState extends ConsumerState<_TimeSettingListPage> {
                       ],
                     ),
                   ),
+
+                  // 曜日別選択ボタン
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          '曜日別選択',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.grey,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Row(
+                          children: [
+                            _buildWeekdayButton('日', DateTime.sunday, Colors.red),
+                            _buildWeekdayButton('月', DateTime.monday, Colors.grey),
+                            _buildWeekdayButton('火', DateTime.tuesday, Colors.grey),
+                            _buildWeekdayButton('水', DateTime.wednesday, Colors.grey),
+                            _buildWeekdayButton('木', DateTime.thursday, Colors.grey),
+                            _buildWeekdayButton('金', DateTime.friday, Colors.grey),
+                            _buildWeekdayButton('土', DateTime.saturday, Colors.blue),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  const SizedBox(height: 12),
+
+                  // 平日・土日祝選択ボタン
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed: _selectWeekdays,
+                            icon: const Icon(Icons.business_center, size: 16),
+                            label: const Text('平日',
+                                style: TextStyle(fontSize: 12)),
+                            style: OutlinedButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(vertical: 8),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed: _selectWeekendsAndHolidays,
+                            icon: const Icon(Icons.weekend, size: 16),
+                            label: const Text('土日祝',
+                                style: TextStyle(fontSize: 12)),
+                            style: OutlinedButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(vertical: 8),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  const SizedBox(height: 12),
+
+                  // 第〇週選択ボタン
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          '週別選択',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.grey,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Row(
+                          children: [
+                            _buildWeekButton('第1週', 1),
+                            _buildWeekButton('第2週', 2),
+                            _buildWeekButton('第3週', 3),
+                            _buildWeekButton('第4週', 4),
+                            _buildWeekButton('第5週', 5),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  const SizedBox(height: 12),
+                ],
 
                 // シフトリスト
                 Expanded(
@@ -1205,6 +1458,52 @@ class _TimeSettingListPageState extends ConsumerState<_TimeSettingListPage> {
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildWeekdayButton(String label, int weekday, Color color) {
+    return Expanded(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 2),
+        child: OutlinedButton(
+          onPressed: () => _selectByWeekday(weekday),
+          style: OutlinedButton.styleFrom(
+            padding: const EdgeInsets.symmetric(vertical: 6),
+            side: BorderSide(color: color),
+            minimumSize: const Size(0, 0),
+          ),
+          child: Text(
+            label,
+            style: TextStyle(
+              fontSize: 12,
+              color: color,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildWeekButton(String label, int week) {
+    return Expanded(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 2),
+        child: OutlinedButton(
+          onPressed: () => _selectByWeekOfMonth(week),
+          style: OutlinedButton.styleFrom(
+            padding: const EdgeInsets.symmetric(vertical: 6),
+            minimumSize: const Size(0, 0),
+          ),
+          child: Text(
+            label,
+            style: const TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ),
+      ),
     );
   }
 }
