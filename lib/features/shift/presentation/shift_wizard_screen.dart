@@ -465,6 +465,27 @@ class _DateSelectionPageState extends ConsumerState<_DateSelectionPage> {
     return validDates.every((d) => widget.tempSelectedDates.contains(d));
   }
 
+  // 月の第〇週を取得
+  int _getWeekOfMonth(DateTime date) {
+    final firstDayOfMonth = DateTime(date.year, date.month, 1);
+    final daysSinceFirstDay = date.difference(firstDayOfMonth).inDays;
+    return (daysSinceFirstDay / 7).floor() + 1;
+  }
+
+  // 第〇週の日付をトグル選択
+  void _toggleWeekOfMonth(int week) {
+    _toggleDatesWhere((day) => _getWeekOfMonth(day) == week);
+  }
+
+  // 第〇週が全て選択されているかチェック
+  bool _isWeekOfMonthFullySelected(int week) {
+    final dates = _getDatesInMonth((day) => _getWeekOfMonth(day) == week);
+    final today = _normalizeDate(DateTime.now());
+    final validDates = dates.where((d) => !d.isBefore(today)).toList();
+    if (validDates.isEmpty) return false;
+    return validDates.every((d) => widget.tempSelectedDates.contains(d));
+  }
+
   // 該当日付のシフト情報を取得
   String? _getTimeInfo(DateTime day) {
     final normalized = _normalizeDate(day);
@@ -516,6 +537,11 @@ class _DateSelectionPageState extends ConsumerState<_DateSelectionPage> {
 
           // 曜日別選択ボタン
           _buildWeekdayButtons(),
+
+          const Divider(height: 1),
+
+          // 週別選択ボタン
+          _buildWeekButtons(),
 
           const Divider(height: 1),
 
@@ -934,6 +960,43 @@ class _DateSelectionPageState extends ConsumerState<_DateSelectionPage> {
                   style: TextStyle(
                     fontSize: 12,
                     color: isFullySelected ? Colors.white : colors[index],
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ),
+          );
+        }),
+      ),
+    );
+  }
+
+  Widget _buildWeekButtons() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      child: Row(
+        children: List.generate(5, (index) {
+          final week = index + 1; // 第1週〜第5週
+          final isFullySelected = _isWeekOfMonthFullySelected(week);
+
+          return Expanded(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 2),
+              child: OutlinedButton(
+                onPressed: () => _toggleWeekOfMonth(week),
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 6),
+                  side: BorderSide(
+                    color: isFullySelected ? Colors.green : Colors.grey,
+                  ),
+                  backgroundColor: isFullySelected ? Colors.green : null,
+                  minimumSize: const Size(0, 0),
+                ),
+                child: Text(
+                  '第${week}週',
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: isFullySelected ? Colors.white : Colors.black,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
