@@ -1660,12 +1660,12 @@ class _TimeSettingListPageState extends ConsumerState<_TimeSettingListPage>
                     SnackBar(
                         content: Text('${_selectedUniqueKeys.length}件の時間を設定しました')),
                   );
-                }
-              },
-              child: const Text('設定'),
-            ),
-          ],
-        ),
+                },
+                child: const Text('設定'),
+              ),
+            ],
+          );
+        },
       ),
     );
   }
