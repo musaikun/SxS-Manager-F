@@ -550,9 +550,12 @@ class _DateSelectionPageState extends ConsumerState<_DateSelectionPage> {
               scrollDirection: Axis.vertical,
               itemCount: monthsList.length,
               onPageChanged: (index) {
+                final newMonth = monthsList[index];
                 setState(() {
                   _currentPageIndex = index;
                 });
+                // focusedDayを現在の月に更新（一括選択ボタンが正しく動作するように）
+                widget.onFocusedDayChanged(newMonth);
               },
               itemBuilder: (context, index) {
                 final month = monthsList[index];
