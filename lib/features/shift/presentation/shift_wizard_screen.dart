@@ -1376,7 +1376,12 @@ class _TimeSettingListPageState extends ConsumerState<_TimeSettingListPage>
       );
 
       final startMinutes = start.hour * 60 + start.minute;
-      final endMinutes = end.hour * 60 + end.minute;
+      var endMinutes = end.hour * 60 + end.minute;
+
+      // 日をまたぐ場合（終了時刻が開始時刻より前）
+      if (endMinutes <= startMinutes) {
+        endMinutes += 1440; // 24時間を追加
+      }
 
       return (endMinutes - startMinutes) / 60.0;
     } catch (e) {
@@ -1925,7 +1930,9 @@ class _TimeSettingListPageState extends ConsumerState<_TimeSettingListPage>
                                 '時間設定 (${_selectedUniqueKeys.length})',
                                 style: const TextStyle(fontSize: 12)),
                             style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.green,
+                              backgroundColor: _selectedUniqueKeys.isEmpty
+                                  ? null
+                                  : Colors.blue,
                               foregroundColor: Colors.white,
                             ),
                           ),
@@ -2349,7 +2356,12 @@ class _ConfirmationPageState extends ConsumerState<_ConfirmationPage>
       );
 
       final startMinutes = start.hour * 60 + start.minute;
-      final endMinutes = end.hour * 60 + end.minute;
+      var endMinutes = end.hour * 60 + end.minute;
+
+      // 日をまたぐ場合（終了時刻が開始時刻より前）
+      if (endMinutes <= startMinutes) {
+        endMinutes += 1440; // 24時間を追加
+      }
 
       return (endMinutes - startMinutes) / 60.0;
     } catch (e) {
