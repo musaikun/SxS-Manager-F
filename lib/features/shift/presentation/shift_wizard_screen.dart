@@ -1151,6 +1151,37 @@ class _TimeSettingListPageState extends ConsumerState<_TimeSettingListPage> {
     return keys.every((k) => _selectedUniqueKeys.contains(k));
   }
 
+  // =========== 選択可能な項目が存在するかチェック ===========
+
+  // 該当する曜日のシフトが存在するかチェック
+  bool _hasWeekday(int weekday) {
+    final shiftDates = ref.read(shiftDateProvider);
+    return shiftDates.any((shift) => shift.date.weekday == weekday);
+  }
+
+  // 平日のシフトが存在するかチェック
+  bool _hasWeekdays() {
+    final shiftDates = ref.read(shiftDateProvider);
+    return shiftDates.any((shift) =>
+        shift.date.weekday >= DateTime.monday &&
+        shift.date.weekday <= DateTime.friday);
+  }
+
+  // 土日祝のシフトが存在するかチェック
+  bool _hasWeekendsOrHolidays() {
+    final shiftDates = ref.read(shiftDateProvider);
+    return shiftDates.any((shift) =>
+        shift.date.weekday == DateTime.saturday ||
+        shift.date.weekday == DateTime.sunday ||
+        _isHoliday(shift.date));
+  }
+
+  // 該当する週のシフトが存在するかチェック
+  bool _hasWeekOfMonth(int week) {
+    final shiftDates = ref.read(shiftDateProvider);
+    return shiftDates.any((shift) => _getWeekOfMonth(shift.date) == week);
+  }
+
   // 勤務時間を計算（時間単位）
   double? _calculateWorkHours(String? startTime, String? endTime) {
     if (startTime == null || endTime == null) return null;
@@ -1530,7 +1561,8 @@ class _TimeSettingListPageState extends ConsumerState<_TimeSettingListPage> {
                       children: [
                         Expanded(
                           child: OutlinedButton.icon(
-                            onPressed: _selectWeekdays,
+                            onPressed:
+                                _hasWeekdays() ? _selectWeekdays : null,
                             icon: const Icon(Icons.business_center, size: 16),
                             label: const Text('平日',
                                 style: TextStyle(fontSize: 12)),
@@ -1543,9 +1575,11 @@ class _TimeSettingListPageState extends ConsumerState<_TimeSettingListPage> {
                                   ? Colors.white
                                   : null,
                               side: BorderSide(
-                                color: _isWeekdaysFullySelected()
-                                    ? Colors.green
-                                    : Colors.grey,
+                                color: !_hasWeekdays()
+                                    ? Colors.grey.shade300
+                                    : (_isWeekdaysFullySelected()
+                                        ? Colors.green
+                                        : Colors.grey),
                               ),
                             ),
                           ),
@@ -1553,7 +1587,9 @@ class _TimeSettingListPageState extends ConsumerState<_TimeSettingListPage> {
                         const SizedBox(width: 8),
                         Expanded(
                           child: OutlinedButton.icon(
-                            onPressed: _selectWeekendsAndHolidays,
+                            onPressed: _hasWeekendsOrHolidays()
+                                ? _selectWeekendsAndHolidays
+                                : null,
                             icon: const Icon(Icons.weekend, size: 16),
                             label: const Text('土日祝',
                                 style: TextStyle(fontSize: 12)),
@@ -1568,9 +1604,11 @@ class _TimeSettingListPageState extends ConsumerState<_TimeSettingListPage> {
                                       ? Colors.white
                                       : null,
                               side: BorderSide(
-                                color: _isWeekendsAndHolidaysFullySelected()
-                                    ? Colors.green
-                                    : Colors.grey,
+                                color: !_hasWeekendsOrHolidays()
+                                    ? Colors.grey.shade300
+                                    : (_isWeekendsAndHolidaysFullySelected()
+                                        ? Colors.green
+                                        : Colors.grey),
                               ),
                             ),
                           ),
@@ -1739,15 +1777,20 @@ class _TimeSettingListPageState extends ConsumerState<_TimeSettingListPage> {
 
   Widget _buildWeekdayButton(String label, int weekday, Color color) {
     final isFullySelected = _isWeekdayFullySelected(weekday);
+    final hasWeekday = _hasWeekday(weekday);
 
     return Expanded(
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 2),
         child: OutlinedButton(
-          onPressed: () => _selectByWeekday(weekday),
+          onPressed: hasWeekday ? () => _selectByWeekday(weekday) : null,
           style: OutlinedButton.styleFrom(
             padding: const EdgeInsets.symmetric(vertical: 6),
-            side: BorderSide(color: isFullySelected ? Colors.green : color),
+            side: BorderSide(
+              color: !hasWeekday
+                  ? Colors.grey.shade300
+                  : (isFullySelected ? Colors.green : color),
+            ),
             backgroundColor: isFullySelected ? Colors.green : null,
             minimumSize: const Size(0, 0),
           ),
@@ -1755,7 +1798,9 @@ class _TimeSettingListPageState extends ConsumerState<_TimeSettingListPage> {
             label,
             style: TextStyle(
               fontSize: 12,
-              color: isFullySelected ? Colors.white : color,
+              color: !hasWeekday
+                  ? Colors.grey.shade400
+                  : (isFullySelected ? Colors.white : color),
               fontWeight: FontWeight.bold,
             ),
           ),
@@ -1766,16 +1811,19 @@ class _TimeSettingListPageState extends ConsumerState<_TimeSettingListPage> {
 
   Widget _buildWeekButton(String label, int week) {
     final isFullySelected = _isWeekOfMonthFullySelected(week);
+    final hasWeek = _hasWeekOfMonth(week);
 
     return Expanded(
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 2),
         child: OutlinedButton(
-          onPressed: () => _selectByWeekOfMonth(week),
+          onPressed: hasWeek ? () => _selectByWeekOfMonth(week) : null,
           style: OutlinedButton.styleFrom(
             padding: const EdgeInsets.symmetric(vertical: 6),
             side: BorderSide(
-              color: isFullySelected ? Colors.green : Colors.grey,
+              color: !hasWeek
+                  ? Colors.grey.shade300
+                  : (isFullySelected ? Colors.green : Colors.grey),
             ),
             backgroundColor: isFullySelected ? Colors.green : null,
             minimumSize: const Size(0, 0),
@@ -1784,7 +1832,9 @@ class _TimeSettingListPageState extends ConsumerState<_TimeSettingListPage> {
             label,
             style: TextStyle(
               fontSize: 11,
-              color: isFullySelected ? Colors.white : Colors.black,
+              color: !hasWeek
+                  ? Colors.grey.shade400
+                  : (isFullySelected ? Colors.white : Colors.black),
               fontWeight: FontWeight.bold,
             ),
           ),
