@@ -2179,8 +2179,31 @@ class _MonthAccordion extends StatefulWidget {
   State<_MonthAccordion> createState() => _MonthAccordionState();
 }
 
-class _MonthAccordionState extends State<_MonthAccordion> {
+class _MonthAccordionState extends State<_MonthAccordion>
+    with SingleTickerProviderStateMixin {
   bool _isExpanded = true;
+  late AnimationController _blinkController;
+  late Animation<double> _blinkAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    // ブリンクアニメーションの初期化（1.5秒周期でゆっくり点滅）
+    _blinkController = AnimationController(
+      duration: const Duration(milliseconds: 1500),
+      vsync: this,
+    )..repeat(reverse: true);
+
+    _blinkAnimation = Tween<double>(begin: 0.3, end: 1.0).animate(
+      CurvedAnimation(parent: _blinkController, curve: Curves.easeInOut),
+    );
+  }
+
+  @override
+  void dispose() {
+    _blinkController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
