@@ -270,8 +270,6 @@ class _DateSelectionPage extends ConsumerStatefulWidget {
 }
 
 class _DateSelectionPageState extends ConsumerState<_DateSelectionPage> {
-  CalendarFormat _calendarFormat = CalendarFormat.month;
-
   // 2025-2026年の祝日リスト（日本）
   final Map<DateTime, String> _holidays = {
     DateTime.utc(2025, 1, 1): '元日',
@@ -474,8 +472,20 @@ class _DateSelectionPageState extends ConsumerState<_DateSelectionPage> {
     return null;
   }
 
+  // 表示する月のリストを生成（現在月から3ヶ月先まで）
+  List<DateTime> _generateMonthsList() {
+    final now = DateTime.now();
+    final List<DateTime> months = [];
+    for (int i = 0; i < 4; i++) {
+      months.add(DateTime(now.year, now.month + i, 1));
+    }
+    return months;
+  }
+
   @override
   Widget build(BuildContext context) {
+    final monthsList = _generateMonthsList();
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('出勤日を選択'),
@@ -494,35 +504,40 @@ class _DateSelectionPageState extends ConsumerState<_DateSelectionPage> {
 
           const Divider(height: 1),
 
-          // カレンダー
+          // カレンダー（縦スクロール）
           Expanded(
-            child: TableCalendar(
-              firstDay: DateTime.utc(2020, 1, 1),
-              lastDay: DateTime.utc(2030, 12, 31),
-              focusedDay: widget.focusedDay,
-              calendarFormat: _calendarFormat,
-              locale: 'ja_JP',
-              selectedDayPredicate: (day) => _isSelected(day),
-              enabledDayPredicate: (day) {
-                final today = _normalizeDate(DateTime.now());
-                return !_normalizeDate(day).isBefore(today);
-              },
-              onDaySelected: (selectedDay, focusedDay) {
-                _toggleDate(selectedDay);
-                widget.onFocusedDayChanged(focusedDay);
-              },
-              onPageChanged: (focusedDay) {
-                // 月が変わったらfocusedDayを更新
-                widget.onFocusedDayChanged(focusedDay);
-              },
-              headerStyle: const HeaderStyle(
-                formatButtonVisible: false,
-                titleCentered: true,
-                titleTextStyle: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
+            child: ListView.builder(
+              itemCount: monthsList.length,
+              itemBuilder: (context, index) {
+                final month = monthsList[index];
+                return Padding(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 8, vertical: 8),
+                  child: TableCalendar(
+                    firstDay: month,
+                    lastDay: DateTime(month.year, month.month + 1, 0),
+                    focusedDay: month,
+                    calendarFormat: CalendarFormat.month,
+                    locale: 'ja_JP',
+                    availableGestures: AvailableGestures.none,
+                    selectedDayPredicate: (day) => _isSelected(day),
+                    enabledDayPredicate: (day) {
+                      final today = _normalizeDate(DateTime.now());
+                      return !_normalizeDate(day).isBefore(today);
+                    },
+                    onDaySelected: (selectedDay, focusedDay) {
+                      _toggleDate(selectedDay);
+                    },
+                    headerStyle: const HeaderStyle(
+                      formatButtonVisible: false,
+                      leftChevronVisible: false,
+                      rightChevronVisible: false,
+                      titleCentered: true,
+                      titleTextStyle: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
               calendarStyle: CalendarStyle(
                 // デフォルト（薄いグレーの背景）
                 defaultDecoration: BoxDecoration(
@@ -754,6 +769,9 @@ class _DateSelectionPageState extends ConsumerState<_DateSelectionPage> {
                   );
                 },
               ),
+                  ),
+                );
+              },
             ),
           ),
 
@@ -960,9 +978,12 @@ class _TimeSettingListPage extends ConsumerStatefulWidget {
       _TimeSettingListPageState();
 }
 
-class _TimeSettingListPageState extends ConsumerState<_TimeSettingListPage> {
+class _TimeSettingListPageState extends ConsumerState<_TimeSettingListPage>
+    with SingleTickerProviderStateMixin {
   final Set<String> _selectedUniqueKeys = {};
   bool _isSelectionMode = false;
+  late AnimationController _blinkController;
+  late Animation<double> _blinkAnimation;
 
   // 2025-2026年の祝日リスト（日本）
   final Map<DateTime, String> _holidays = {
@@ -1004,6 +1025,26 @@ class _TimeSettingListPageState extends ConsumerState<_TimeSettingListPage> {
     DateTime.utc(2026, 11, 3): '文化の日',
     DateTime.utc(2026, 11, 23): '勤労感謝の日',
   };
+
+  @override
+  void initState() {
+    super.initState();
+    // ブリンクアニメーションの初期化（1.5秒周期でゆっくり点滅）
+    _blinkController = AnimationController(
+      duration: const Duration(milliseconds: 1500),
+      vsync: this,
+    )..repeat(reverse: true);
+
+    _blinkAnimation = Tween<double>(begin: 0.3, end: 1.0).animate(
+      CurvedAnimation(parent: _blinkController, curve: Curves.easeInOut),
+    );
+  }
+
+  @override
+  void dispose() {
+    _blinkController.dispose();
+    super.dispose();
+  }
 
   DateTime _normalizeDate(DateTime date) {
     return DateTime.utc(date.year, date.month, date.day);
@@ -1702,16 +1743,28 @@ class _TimeSettingListPageState extends ConsumerState<_TimeSettingListPage> {
                             style:
                                 const TextStyle(fontWeight: FontWeight.bold),
                           ),
-                          subtitle: Text(
-                            shift.startTime != null && shift.endTime != null
-                                ? '${shift.startTime} - ${shift.endTime}'
-                                : '時間未設定',
-                            style: TextStyle(
-                              color: shift.startTime != null
-                                  ? Colors.black87
-                                  : Colors.grey,
-                            ),
-                          ),
+                          subtitle: shift.startTime != null && shift.endTime != null
+                              ? Text(
+                                  '${shift.startTime} - ${shift.endTime}',
+                                  style: const TextStyle(
+                                    color: Colors.black87,
+                                  ),
+                                )
+                              : AnimatedBuilder(
+                                  animation: _blinkAnimation,
+                                  builder: (context, child) {
+                                    return Opacity(
+                                      opacity: _blinkAnimation.value,
+                                      child: const Text(
+                                        '時間未設定',
+                                        style: TextStyle(
+                                          color: Colors.red,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    );
+                                  },
+                                ),
                           trailing: _isSelectionMode
                               ? null
                               : const Icon(Icons.edit),
@@ -1848,12 +1901,41 @@ class _TimeSettingListPageState extends ConsumerState<_TimeSettingListPage> {
 // Page 3: 確認・提出
 // ============================================================
 
-class _ConfirmationPage extends ConsumerWidget {
+class _ConfirmationPage extends ConsumerStatefulWidget {
   final VoidCallback onPrevious;
 
   const _ConfirmationPage({
     required this.onPrevious,
   });
+
+  @override
+  ConsumerState<_ConfirmationPage> createState() => _ConfirmationPageState();
+}
+
+class _ConfirmationPageState extends ConsumerState<_ConfirmationPage>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _blinkController;
+  late Animation<double> _blinkAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    // ブリンクアニメーションの初期化（1.5秒周期でゆっくり点滅）
+    _blinkController = AnimationController(
+      duration: const Duration(milliseconds: 1500),
+      vsync: this,
+    )..repeat(reverse: true);
+
+    _blinkAnimation = Tween<double>(begin: 0.3, end: 1.0).animate(
+      CurvedAnimation(parent: _blinkController, curve: Curves.easeInOut),
+    );
+  }
+
+  @override
+  void dispose() {
+    _blinkController.dispose();
+    super.dispose();
+  }
 
   // 勤務時間を計算（時間単位）
   double? _calculateWorkHours(String? startTime, String? endTime) {
@@ -1900,7 +1982,7 @@ class _ConfirmationPage extends ConsumerWidget {
   }
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final shiftDates = ref.watch(shiftDateProvider);
     final stores = ref.watch(storeProvider);
     final stats = _calculateStatistics(shiftDates);
@@ -1919,7 +2001,7 @@ class _ConfirmationPage extends ConsumerWidget {
         backgroundColor: Theme.of(context).colorScheme.inversePrimary,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
-          onPressed: onPrevious,
+          onPressed: widget.onPrevious,
         ),
       ),
       body: shiftDates.isEmpty
@@ -2138,12 +2220,27 @@ class _MonthAccordionState extends State<_MonthAccordion> {
                   '${shift.date.month}/${shift.date.day}',
                   style: const TextStyle(fontSize: 14),
                 ),
-                subtitle: Text(
-                  shift.startTime != null && shift.endTime != null
-                      ? '${shift.startTime} - ${shift.endTime}'
-                      : '時間未設定',
-                  style: const TextStyle(fontSize: 12),
-                ),
+                subtitle: shift.startTime != null && shift.endTime != null
+                    ? Text(
+                        '${shift.startTime} - ${shift.endTime}',
+                        style: const TextStyle(fontSize: 12),
+                      )
+                    : AnimatedBuilder(
+                        animation: _blinkAnimation,
+                        builder: (context, child) {
+                          return Opacity(
+                            opacity: _blinkAnimation.value,
+                            child: const Text(
+                              '時間未設定',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.red,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          );
+                        },
+                      ),
               );
             }).toList(),
         ],
