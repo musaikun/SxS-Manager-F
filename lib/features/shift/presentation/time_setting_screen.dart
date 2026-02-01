@@ -77,18 +77,7 @@ class _TimeSettingScreenState extends ConsumerState<TimeSettingScreen> {
       return;
     }
 
-    // 時刻の妥当性チェック
-    final startMinutes = _startTime!.hour * 60 + _startTime!.minute;
-    final endMinutes = _endTime!.hour * 60 + _endTime!.minute;
-
-    if (startMinutes >= endMinutes) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('終了時刻は開始時刻より後にしてください')),
-      );
-      return;
-    }
-
-    // Providerに保存
+    // Providerに保存（日をまたぐ場合も許可）
     ref.read(shiftDateProvider.notifier).updateTime(
           widget.uniqueKey,
           _timeToString(_startTime!),
@@ -108,175 +97,381 @@ class _TimeSettingScreenState extends ConsumerState<TimeSettingScreen> {
     );
   }
 
-  // 勤務時間を計算
+  // 勤務時間を計算（日をまたぐ場合も対応）
   String _calculateWorkingHours() {
     if (_startTime == null || _endTime == null) {
       return '--';
     }
 
     final startMinutes = _startTime!.hour * 60 + _startTime!.minute;
-    final endMinutes = _endTime!.hour * 60 + _endTime!.minute;
+    var endMinutes = _endTime!.hour * 60 + _endTime!.minute;
+
+    // 終了時刻が開始時刻より前の場合は翌日とみなす
+    if (endMinutes <= startMinutes) {
+      endMinutes += 1440; // 24時間を追加
+    }
+
     final diff = endMinutes - startMinutes;
-
-    if (diff <= 0) return '--';
-
     final hours = diff ~/ 60;
     final minutes = diff % 60;
 
     return '$hours時間${minutes > 0 ? "$minutes分" : ""}';
   }
 
-  // 時間設定ダイアログを表示
+  // 分を0, 15, 30, 45の15分刻みに丸める
+  int _roundMinutes(int minutes) {
+    if (minutes < 8) return 0;
+    if (minutes < 23) return 15;
+    if (minutes < 38) return 30;
+    if (minutes < 53) return 45;
+    return 0; // 53以上は次の時間の0分
+  }
+
+  // 時間を分単位に変換（0-1439）
+  int _timeToMinutes(TimeOfDay time) {
+    return time.hour * 60 + time.minute;
+  }
+
+  // 分単位を時間に変換
+  TimeOfDay _minutesToTime(int minutes) {
+    return TimeOfDay(hour: (minutes ~/ 60) % 24, minute: minutes % 60);
+  }
+
+  // 時間設定ダイアログを表示（スライダー式）
   void _showTimeSettingDialog() {
-    TimeOfDay? tempStartTime = _startTime;
-    TimeOfDay? tempEndTime = _endTime;
+    // 初期値を15分刻みに丸める
+    TimeOfDay initialStartTime = _startTime ?? const TimeOfDay(hour: 9, minute: 0);
+    TimeOfDay initialEndTime = _endTime ?? const TimeOfDay(hour: 18, minute: 0);
+
+    // 分を15分刻みに丸める
+    int startMinutes = initialStartTime.hour * 60 + _roundMinutes(initialStartTime.minute);
+    int endMinutes = initialEndTime.hour * 60 + _roundMinutes(initialEndTime.minute);
+
+    // 終了時刻が開始時刻より前の場合は、翌日とみなす（+1440分）
+    if (endMinutes <= startMinutes) {
+      endMinutes += 1440;
+    }
+
+    double tempStartMinutes = startMinutes.toDouble();
+    double tempEndMinutes = endMinutes.toDouble();
 
     showDialog(
       context: context,
       builder: (context) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          title: const Text('勤務時間設定'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // 開始時刻
-              ListTile(
-                leading: const Icon(Icons.login, color: Colors.green),
-                title: const Text('開始時刻'),
-                trailing: Text(
-                  tempStartTime?.format(context) ?? '未設定',
-                  style: const TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                onTap: () async {
-                  final picked = await showTimePicker(
-                    context: context,
-                    initialTime:
-                        tempStartTime ?? const TimeOfDay(hour: 9, minute: 0),
-                  );
-                  if (picked != null) {
-                    setDialogState(() {
-                      tempStartTime = picked;
-                    });
-                  }
-                },
-              ),
-              const Divider(),
-              // 終了時刻
-              ListTile(
-                leading: const Icon(Icons.logout, color: Colors.red),
-                title: const Text('終了時刻'),
-                trailing: Text(
-                  tempEndTime?.format(context) ?? '未設定',
-                  style: const TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                onTap: () async {
-                  final picked = await showTimePicker(
-                    context: context,
-                    initialTime:
-                        tempEndTime ?? const TimeOfDay(hour: 18, minute: 0),
-                  );
-                  if (picked != null) {
-                    setDialogState(() {
-                      tempEndTime = picked;
-                    });
-                  }
-                },
-              ),
-              const SizedBox(height: 16),
-              // クイック設定
-              const Text(
-                'クイック設定',
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
+        builder: (context, setDialogState) {
+          TimeOfDay currentStartTime = _minutesToTime(tempStartMinutes.round());
+          TimeOfDay currentEndTime = _minutesToTime(tempEndMinutes.round() % 1440);
+
+          // 勤務時間を計算
+          int workingMinutes = (tempEndMinutes - tempStartMinutes).round();
+          int workingHours = workingMinutes ~/ 60;
+          int workingMins = workingMinutes % 60;
+
+          // 日をまたぐかどうか
+          bool crossesMidnight = tempEndMinutes >= 1440;
+
+          return AlertDialog(
+            title: const Text('勤務時間設定'),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  _buildDialogQuickSetButton(
-                    setDialogState,
-                    (start, end) {
-                      tempStartTime = start;
-                      tempEndTime = end;
-                    },
-                    '9:00-18:00',
-                    9,
-                    0,
-                    18,
-                    0,
+                  // 時間範囲の視覚表示
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Colors.blue[50],
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Column(
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceAround,
+                          children: [
+                            Column(
+                              children: [
+                                const Text(
+                                  '開始',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: Colors.grey,
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  '${currentStartTime.hour.toString().padLeft(2, '0')}:${currentStartTime.minute.toString().padLeft(2, '0')}',
+                                  style: const TextStyle(
+                                    fontSize: 32,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.green,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const Icon(Icons.arrow_forward, size: 32, color: Colors.grey),
+                            Column(
+                              children: [
+                                Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    const Text(
+                                      '終了',
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: Colors.grey,
+                                      ),
+                                    ),
+                                    if (crossesMidnight) ...[
+                                      const SizedBox(width: 4),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 6,
+                                          vertical: 2,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: Colors.orange[100],
+                                          borderRadius: BorderRadius.circular(4),
+                                        ),
+                                        child: Text(
+                                          '翌日',
+                                          style: TextStyle(
+                                            fontSize: 10,
+                                            color: Colors.orange[800],
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ],
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  '${currentEndTime.hour.toString().padLeft(2, '0')}:${currentEndTime.minute.toString().padLeft(2, '0')}',
+                                  style: const TextStyle(
+                                    fontSize: 32,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.red,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 8,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Text(
+                            '勤務時間: $workingHours時間${workingMins > 0 ? "$workingMins分" : ""}',
+                            style: TextStyle(
+                              fontSize: 16,
+                              color: Colors.blue[800],
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                  _buildDialogQuickSetButton(
-                    setDialogState,
-                    (start, end) {
-                      tempStartTime = start;
-                      tempEndTime = end;
-                    },
-                    '10:00-19:00',
-                    10,
-                    0,
-                    19,
-                    0,
+                  const SizedBox(height: 24),
+
+                  // 開始時刻スライダー
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          const Icon(Icons.login, color: Colors.green, size: 20),
+                          const SizedBox(width: 8),
+                          const Text(
+                            '開始時刻',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          const Spacer(),
+                          Text(
+                            '${currentStartTime.hour}:${currentStartTime.minute.toString().padLeft(2, '0')}',
+                            style: const TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.green,
+                            ),
+                          ),
+                        ],
+                      ),
+                      Slider(
+                        value: tempStartMinutes,
+                        min: 0,
+                        max: 1425, // 23:45まで（15分刻み）
+                        divisions: 95, // 24時間 × 4 (15分刻み) - 1
+                        activeColor: Colors.green,
+                        label: '${currentStartTime.hour}:${currentStartTime.minute.toString().padLeft(2, '0')}',
+                        onChanged: (value) {
+                          setDialogState(() {
+                            // 15分刻みに丸める
+                            tempStartMinutes = (value ~/ 15 * 15).toDouble();
+                            // 終了時刻が開始時刻より前にならないように調整
+                            if (tempEndMinutes <= tempStartMinutes) {
+                              tempEndMinutes = tempStartMinutes + 60; // 最低1時間の勤務時間
+                            }
+                          });
+                        },
+                      ),
+                    ],
                   ),
-                  _buildDialogQuickSetButton(
-                    setDialogState,
-                    (start, end) {
-                      tempStartTime = start;
-                      tempEndTime = end;
-                    },
-                    '13:00-22:00',
-                    13,
-                    0,
-                    22,
-                    0,
+
+                  const SizedBox(height: 16),
+
+                  // 終了時刻スライダー
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          const Icon(Icons.logout, color: Colors.red, size: 20),
+                          const SizedBox(width: 8),
+                          const Text(
+                            '終了時刻',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          const Spacer(),
+                          Text(
+                            '${currentEndTime.hour}:${currentEndTime.minute.toString().padLeft(2, '0')}',
+                            style: const TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.red,
+                            ),
+                          ),
+                        ],
+                      ),
+                      Slider(
+                        value: tempEndMinutes,
+                        min: tempStartMinutes + 15, // 開始時刻の15分後から
+                        max: tempStartMinutes + 1425, // 開始時刻から最大23時間45分後
+                        divisions: ((tempStartMinutes + 1425 - tempStartMinutes - 15) ~/ 15).toInt(),
+                        activeColor: Colors.red,
+                        label: '${currentEndTime.hour}:${currentEndTime.minute.toString().padLeft(2, '0')}${crossesMidnight ? " (翌日)" : ""}',
+                        onChanged: (value) {
+                          setDialogState(() {
+                            // 15分刻みに丸める
+                            tempEndMinutes = (value ~/ 15 * 15).toDouble();
+                          });
+                        },
+                      ),
+                    ],
                   ),
-                  _buildDialogQuickSetButton(
-                    setDialogState,
-                    (start, end) {
-                      tempStartTime = start;
-                      tempEndTime = end;
-                    },
-                    '17:00-23:00',
-                    17,
-                    0,
-                    23,
-                    0,
+
+                  const SizedBox(height: 16),
+
+                  // クイック設定
+                  const Text(
+                    'クイック設定',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      _buildDialogQuickSetButton(
+                        setDialogState,
+                        (start, end) {
+                          tempStartMinutes = _timeToMinutes(start).toDouble();
+                          tempEndMinutes = _timeToMinutes(end).toDouble();
+                        },
+                        '9:00-18:00',
+                        9,
+                        0,
+                        18,
+                        0,
+                      ),
+                      _buildDialogQuickSetButton(
+                        setDialogState,
+                        (start, end) {
+                          tempStartMinutes = _timeToMinutes(start).toDouble();
+                          tempEndMinutes = _timeToMinutes(end).toDouble();
+                        },
+                        '10:00-19:00',
+                        10,
+                        0,
+                        19,
+                        0,
+                      ),
+                      _buildDialogQuickSetButton(
+                        setDialogState,
+                        (start, end) {
+                          tempStartMinutes = _timeToMinutes(start).toDouble();
+                          tempEndMinutes = _timeToMinutes(end).toDouble();
+                        },
+                        '13:00-22:00',
+                        13,
+                        0,
+                        22,
+                        0,
+                      ),
+                      _buildDialogQuickSetButton(
+                        setDialogState,
+                        (start, end) {
+                          tempStartMinutes = _timeToMinutes(start).toDouble();
+                          tempEndMinutes = _timeToMinutes(end).toDouble();
+                        },
+                        '17:00-23:00',
+                        17,
+                        0,
+                        23,
+                        0,
+                      ),
+                      _buildDialogQuickSetButton(
+                        setDialogState,
+                        (start, end) {
+                          tempStartMinutes = _timeToMinutes(start).toDouble();
+                          // 深夜帯なので翌日扱い
+                          tempEndMinutes = (_timeToMinutes(end) + 1440).toDouble();
+                        },
+                        '22:00-翌7:00',
+                        22,
+                        0,
+                        7,
+                        0,
+                      ),
+                    ],
                   ),
                 ],
               ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('キャンセル'),
             ),
-            TextButton(
-              onPressed: () {
-                if (tempStartTime != null && tempEndTime != null) {
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('キャンセル'),
+              ),
+              TextButton(
+                onPressed: () {
                   setState(() {
-                    _startTime = tempStartTime;
-                    _endTime = tempEndTime;
+                    _startTime = _minutesToTime(tempStartMinutes.round());
+                    _endTime = _minutesToTime(tempEndMinutes.round() % 1440);
                   });
                   Navigator.pop(context);
-                } else {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('開始時刻と終了時刻を設定してください')),
-                  );
-                }
-              },
-              child: const Text('設定'),
-            ),
-          ],
-        ),
+                },
+                child: const Text('設定'),
+              ),
+            ],
+          );
+        },
       ),
     );
   }
