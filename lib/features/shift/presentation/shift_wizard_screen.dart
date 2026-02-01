@@ -270,6 +270,21 @@ class _DateSelectionPage extends ConsumerStatefulWidget {
 }
 
 class _DateSelectionPageState extends ConsumerState<_DateSelectionPage> {
+  late PageController _calendarPageController;
+  int _currentPageIndex = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _calendarPageController = PageController(initialPage: 0);
+  }
+
+  @override
+  void dispose() {
+    _calendarPageController.dispose();
+    super.dispose();
+  }
+
   // 2025-2026年の祝日リスト（日本）
   final Map<DateTime, String> _holidays = {
     DateTime.utc(2025, 1, 1): '元日',
@@ -504,15 +519,45 @@ class _DateSelectionPageState extends ConsumerState<_DateSelectionPage> {
 
           const Divider(height: 1),
 
-          // カレンダー（縦スクロール）
+          // スワイプヒント
+          Container(
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.arrow_upward, size: 16, color: Colors.grey[600]),
+                const SizedBox(width: 8),
+                Text(
+                  '上下にスワイプで月を移動',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Colors.grey[600],
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Icon(Icons.arrow_downward, size: 16, color: Colors.grey[600]),
+              ],
+            ),
+          ),
+
+          const Divider(height: 1),
+
+          // カレンダー（縦PageView）
           Expanded(
-            child: ListView.builder(
+            child: PageView.builder(
+              controller: _calendarPageController,
+              scrollDirection: Axis.vertical,
               itemCount: monthsList.length,
+              onPageChanged: (index) {
+                setState(() {
+                  _currentPageIndex = index;
+                });
+              },
               itemBuilder: (context, index) {
                 final month = monthsList[index];
                 return Padding(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 8, vertical: 8),
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
                   child: TableCalendar(
                     firstDay: month,
                     lastDay: DateTime(month.year, month.month + 1, 0),
@@ -791,29 +836,56 @@ class _DateSelectionPageState extends ConsumerState<_DateSelectionPage> {
                   const Border(top: BorderSide(color: Colors.grey, width: 1)),
             ),
             child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Container(
-                  padding: const EdgeInsets.all(6),
-                  decoration: const BoxDecoration(
-                    color: Colors.white,
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(
-                    Icons.check_circle,
-                    size: 20,
-                    color: Colors.green,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Text(
-                  '選択: ${widget.tempSelectedDates.length}日',
-                  style: const TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.black87,
+                // ページインジケーター
+                Padding(
+                  padding: const EdgeInsets.only(left: 16),
+                  child: Row(
+                    children: List.generate(_generateMonthsList().length, (index) {
+                      return Container(
+                        margin: const EdgeInsets.symmetric(horizontal: 3),
+                        width: 8,
+                        height: 8,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: _currentPageIndex == index
+                              ? Colors.green
+                              : Colors.grey.shade400,
+                        ),
+                      );
+                    }),
                   ),
                 ),
+                // 選択数表示
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(6),
+                      decoration: const BoxDecoration(
+                        color: Colors.white,
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(
+                        Icons.check_circle,
+                        size: 20,
+                        color: Colors.green,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Text(
+                      '選択: ${widget.tempSelectedDates.length}日',
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.black87,
+                      ),
+                    ),
+                  ],
+                ),
+                // 右側のスペーサー
+                const SizedBox(width: 60),
               ],
             ),
           ),
@@ -1267,6 +1339,16 @@ class _TimeSettingListPageState extends ConsumerState<_TimeSettingListPage>
     };
   }
 
+  // 時間を分単位に変換（0-1439）
+  int _timeToMinutes(TimeOfDay time) {
+    return time.hour * 60 + time.minute;
+  }
+
+  // 分単位を時間に変換
+  TimeOfDay _minutesToTime(int minutes) {
+    return TimeOfDay(hour: (minutes ~/ 60) % 24, minute: minutes % 60);
+  }
+
   void _showBatchTimeSettingDialog() {
     if (_selectedUniqueKeys.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -1275,67 +1357,290 @@ class _TimeSettingListPageState extends ConsumerState<_TimeSettingListPage>
       return;
     }
 
-    TimeOfDay? startTime;
-    TimeOfDay? endTime;
+    // 初期値
+    double tempStartMinutes = 540.0; // 9:00
+    double tempEndMinutes = 1080.0; // 18:00
 
     showDialog(
       context: context,
       builder: (context) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          title: Text('一括時間設定（${_selectedUniqueKeys.length}件）'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              ListTile(
-                title: const Text('開始時刻'),
-                trailing: Text(
-                  startTime?.format(context) ?? '未設定',
-                  style: const TextStyle(fontSize: 16),
-                ),
-                onTap: () async {
-                  final picked = await showTimePicker(
-                    context: context,
-                    initialTime: startTime ?? const TimeOfDay(hour: 9, minute: 0),
-                  );
-                  if (picked != null) {
-                    setDialogState(() {
-                      startTime = picked;
-                    });
-                  }
-                },
+        builder: (context, setDialogState) {
+          TimeOfDay currentStartTime = _minutesToTime(tempStartMinutes.round());
+          TimeOfDay currentEndTime = _minutesToTime(tempEndMinutes.round() % 1440);
+
+          // 勤務時間を計算
+          int workingMinutes = (tempEndMinutes - tempStartMinutes).round();
+          int workingHours = workingMinutes ~/ 60;
+          int workingMins = workingMinutes % 60;
+
+          // 日をまたぐかどうか
+          bool crossesMidnight = tempEndMinutes >= 1440;
+
+          return AlertDialog(
+            title: Text('一括時間設定（${_selectedUniqueKeys.length}件）'),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // 時間範囲の視覚表示
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Colors.blue[50],
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Column(
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceAround,
+                          children: [
+                            Column(
+                              children: [
+                                const Text(
+                                  '開始',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: Colors.grey,
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  '${currentStartTime.hour.toString().padLeft(2, '0')}:${currentStartTime.minute.toString().padLeft(2, '0')}',
+                                  style: const TextStyle(
+                                    fontSize: 32,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.green,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const Icon(Icons.arrow_forward, size: 32, color: Colors.grey),
+                            Column(
+                              children: [
+                                Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    const Text(
+                                      '終了',
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: Colors.grey,
+                                      ),
+                                    ),
+                                    if (crossesMidnight) ...[
+                                      const SizedBox(width: 4),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 6,
+                                          vertical: 2,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: Colors.orange[100],
+                                          borderRadius: BorderRadius.circular(4),
+                                        ),
+                                        child: Text(
+                                          '翌日',
+                                          style: TextStyle(
+                                            fontSize: 10,
+                                            color: Colors.orange[800],
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ],
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  '${currentEndTime.hour.toString().padLeft(2, '0')}:${currentEndTime.minute.toString().padLeft(2, '0')}',
+                                  style: const TextStyle(
+                                    fontSize: 32,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.red,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 8,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Text(
+                            '勤務時間: $workingHours時間${workingMins > 0 ? "$workingMins分" : ""}',
+                            style: TextStyle(
+                              fontSize: 16,
+                              color: Colors.blue[800],
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+
+                  // 開始時刻スライダー
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          const Icon(Icons.login, color: Colors.green, size: 20),
+                          const SizedBox(width: 8),
+                          const Text(
+                            '開始時刻',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          const Spacer(),
+                          Text(
+                            '${currentStartTime.hour}:${currentStartTime.minute.toString().padLeft(2, '0')}',
+                            style: const TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.green,
+                            ),
+                          ),
+                        ],
+                      ),
+                      Slider(
+                        value: tempStartMinutes,
+                        min: 0,
+                        max: 1425, // 23:45まで（15分刻み）
+                        divisions: 95, // 24時間 × 4 (15分刻み) - 1
+                        activeColor: Colors.green,
+                        label: '${currentStartTime.hour}:${currentStartTime.minute.toString().padLeft(2, '0')}',
+                        onChanged: (value) {
+                          setDialogState(() {
+                            // 15分刻みに丸める
+                            tempStartMinutes = (value ~/ 15 * 15).toDouble();
+
+                            // 終了時刻が新しい範囲内に収まるように調整
+                            double newMax = tempStartMinutes + 1425;
+                            if (tempEndMinutes > newMax) {
+                              tempEndMinutes = newMax;
+                            }
+
+                            // 終了時刻が開始時刻より前にならないように調整
+                            if (tempEndMinutes <= tempStartMinutes) {
+                              tempEndMinutes = tempStartMinutes + 60; // 最低1時間の勤務時間
+                            }
+                          });
+                        },
+                      ),
+                    ],
+                  ),
+
+                  const SizedBox(height: 16),
+
+                  // 終了時刻スライダー
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          const Icon(Icons.logout, color: Colors.red, size: 20),
+                          const SizedBox(width: 8),
+                          const Text(
+                            '終了時刻',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          const Spacer(),
+                          Text(
+                            '${currentEndTime.hour}:${currentEndTime.minute.toString().padLeft(2, '0')}',
+                            style: const TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.red,
+                            ),
+                          ),
+                        ],
+                      ),
+                      Slider(
+                        value: tempEndMinutes,
+                        min: tempStartMinutes + 15, // 開始時刻の15分後から
+                        max: tempStartMinutes + 1425, // 開始時刻から最大23時間45分後
+                        divisions: ((tempStartMinutes + 1425 - tempStartMinutes - 15) ~/ 15).toInt(),
+                        activeColor: Colors.red,
+                        label: '${currentEndTime.hour}:${currentEndTime.minute.toString().padLeft(2, '0')}${crossesMidnight ? " (翌日)" : ""}',
+                        onChanged: (value) {
+                          setDialogState(() {
+                            // 15分刻みに丸める
+                            tempEndMinutes = (value ~/ 15 * 15).toDouble();
+                          });
+                        },
+                      ),
+                    ],
+                  ),
+
+                  const SizedBox(height: 16),
+
+                  // クイック設定
+                  const Text(
+                    'クイック設定',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      _buildBatchQuickSetButton(setDialogState, (start, end) {
+                        tempStartMinutes = _timeToMinutes(start).toDouble();
+                        tempEndMinutes = _timeToMinutes(end).toDouble();
+                      }, '9:00-18:00', 9, 0, 18, 0),
+                      _buildBatchQuickSetButton(setDialogState, (start, end) {
+                        tempStartMinutes = _timeToMinutes(start).toDouble();
+                        tempEndMinutes = _timeToMinutes(end).toDouble();
+                      }, '10:00-19:00', 10, 0, 19, 0),
+                      _buildBatchQuickSetButton(setDialogState, (start, end) {
+                        tempStartMinutes = _timeToMinutes(start).toDouble();
+                        tempEndMinutes = _timeToMinutes(end).toDouble();
+                      }, '13:00-22:00', 13, 0, 22, 0),
+                      _buildBatchQuickSetButton(setDialogState, (start, end) {
+                        tempStartMinutes = _timeToMinutes(start).toDouble();
+                        tempEndMinutes = _timeToMinutes(end).toDouble();
+                      }, '17:00-23:00', 17, 0, 23, 0),
+                      _buildBatchQuickSetButton(setDialogState, (start, end) {
+                        tempStartMinutes = _timeToMinutes(start).toDouble();
+                        // 深夜帯なので翌日扱い
+                        tempEndMinutes = (_timeToMinutes(end) + 1440).toDouble();
+                      }, '22:00-翌7:00', 22, 0, 7, 0),
+                    ],
+                  ),
+                ],
               ),
-              ListTile(
-                title: const Text('終了時刻'),
-                trailing: Text(
-                  endTime?.format(context) ?? '未設定',
-                  style: const TextStyle(fontSize: 16),
-                ),
-                onTap: () async {
-                  final picked = await showTimePicker(
-                    context: context,
-                    initialTime: endTime ?? const TimeOfDay(hour: 17, minute: 0),
-                  );
-                  if (picked != null) {
-                    setDialogState(() {
-                      endTime = picked;
-                    });
-                  }
-                },
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('キャンセル'),
             ),
-            TextButton(
-              onPressed: () {
-                if (startTime != null && endTime != null) {
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('キャンセル'),
+              ),
+              TextButton(
+                onPressed: () {
+                  final startTime = _minutesToTime(tempStartMinutes.round());
+                  final endTime = _minutesToTime(tempEndMinutes.round() % 1440);
+
                   final startStr =
-                      '${startTime!.hour.toString().padLeft(2, '0')}:${startTime!.minute.toString().padLeft(2, '0')}';
+                      '${startTime.hour.toString().padLeft(2, '0')}:${startTime.minute.toString().padLeft(2, '0')}';
                   final endStr =
-                      '${endTime!.hour.toString().padLeft(2, '0')}:${endTime!.minute.toString().padLeft(2, '0')}';
+                      '${endTime.hour.toString().padLeft(2, '0')}:${endTime.minute.toString().padLeft(2, '0')}';
 
                   // 選択されたシフトに一括で時間を設定
                   for (final uniqueKey in _selectedUniqueKeys) {
@@ -1893,6 +2198,32 @@ class _TimeSettingListPageState extends ConsumerState<_TimeSettingListPage>
           ),
         ),
       ),
+    );
+  }
+
+  // 一括設定用クイック設定ボタン
+  Widget _buildBatchQuickSetButton(
+    StateSetter setDialogState,
+    Function(TimeOfDay, TimeOfDay) onSet,
+    String label,
+    int startHour,
+    int startMinute,
+    int endHour,
+    int endMinute,
+  ) {
+    return OutlinedButton(
+      onPressed: () {
+        setDialogState(() {
+          onSet(
+            TimeOfDay(hour: startHour, minute: startMinute),
+            TimeOfDay(hour: endHour, minute: endMinute),
+          );
+        });
+      },
+      style: OutlinedButton.styleFrom(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      ),
+      child: Text(label, style: const TextStyle(fontSize: 12)),
     );
   }
 }
