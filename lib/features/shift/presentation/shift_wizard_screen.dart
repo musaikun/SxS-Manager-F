@@ -1559,13 +1559,14 @@ class _TimeSettingListPageState extends ConsumerState<_TimeSettingListPage>
                       ),
 
                       // アコーディオンコンテンツ
-                      AnimatedSize(
-                        duration: const Duration(milliseconds: 500),
-                        curve: Curves.easeInOutCubic,
-                        child: _isBatchSelectionExpanded
-                            ? Column(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
+                      ClipRect(
+                        child: AnimatedAlign(
+                          duration: const Duration(milliseconds: 500),
+                          curve: Curves.easeInOutCubic,
+                          heightFactor: _isBatchSelectionExpanded ? 1.0 : 0.0,
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
                   // 全選択、未設定選択、クリア、時間設定ボタン
                   Padding(
                     padding: const EdgeInsets.all(12),
@@ -1789,9 +1790,9 @@ class _TimeSettingListPageState extends ConsumerState<_TimeSettingListPage>
                   ),
 
                   const SizedBox(height: 12),
-                                ],
-                              )
-                            : const SizedBox.shrink(),
+                            ],
+                          ),
+                        ),
                       ),
                     ],
                   ),
