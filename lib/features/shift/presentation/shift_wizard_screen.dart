@@ -301,7 +301,21 @@ class _DateSelectionPageState extends ConsumerState<_DateSelectionPage> {
     setState(() {
       final normalized = ShiftDateUtils.normalizeDate(day);
       if (widget.tempSelectedDates.contains(normalized)) {
+        // 選択解除：日付を削除し、時間も削除
         widget.tempSelectedDates.remove(normalized);
+
+        final defaultStore = ref.read(defaultStoreProvider);
+        final currentShifts = ref.read(shiftDateProvider);
+
+        // 該当するシフトを削除
+        try {
+          final targetShift = currentShifts.firstWhere(
+            (s) => ShiftDateUtils.normalizeDate(s.date) == normalized && s.storeId == defaultStore.id,
+          );
+          ref.read(shiftDateProvider.notifier).removeDate(targetShift.uniqueKey);
+        } catch (e) {
+          // シフトが見つからない場合は何もしない
+        }
       } else {
         widget.tempSelectedDates.add(normalized);
 
@@ -309,12 +323,6 @@ class _DateSelectionPageState extends ConsumerState<_DateSelectionPage> {
         if (_selectedPreset != null) {
           final defaultStore = ref.read(defaultStoreProvider);
           final currentShifts = ref.read(shiftDateProvider);
-
-          // 既存のシフトがあるか確認
-          final existingShift = currentShifts.firstWhere(
-            (s) => ShiftDateUtils.normalizeDate(s.date) == normalized && s.storeId == defaultStore.id,
-            orElse: () => currentShifts.first, // ダミー（実際には使われない）
-          );
 
           // 既存のシフトがない場合のみ追加
           final hasExistingShift = currentShifts.any(
@@ -332,16 +340,20 @@ class _DateSelectionPageState extends ConsumerState<_DateSelectionPage> {
 
           // 追加されたシフトを取得してuniqueKeyで時間を更新
           final updatedShifts = ref.read(shiftDateProvider);
-          final targetShift = updatedShifts.firstWhere(
-            (s) => ShiftDateUtils.normalizeDate(s.date) == normalized && s.storeId == defaultStore.id,
-          );
+          try {
+            final targetShift = updatedShifts.firstWhere(
+              (s) => ShiftDateUtils.normalizeDate(s.date) == normalized && s.storeId == defaultStore.id,
+            );
 
-          ref.read(shiftDateProvider.notifier).updateTimeAndMemo(
-            targetShift.uniqueKey,
-            startTime,
-            endTime,
-            null, // メモはnull
-          );
+            ref.read(shiftDateProvider.notifier).updateTimeAndMemo(
+              targetShift.uniqueKey,
+              startTime,
+              endTime,
+              null, // メモはnull
+            );
+          } catch (e) {
+            // シフトが見つからない場合は何もしない
+          }
         }
       }
     });
@@ -363,8 +375,23 @@ class _DateSelectionPageState extends ConsumerState<_DateSelectionPage> {
           validDates.every((d) => widget.tempSelectedDates.contains(d));
 
       if (allSelected) {
-        // 解除
+        // 解除：日付を削除し、時間も削除
         validDates.forEach(widget.tempSelectedDates.remove);
+
+        final defaultStore = ref.read(defaultStoreProvider);
+        final currentShifts = ref.read(shiftDateProvider);
+
+        // 該当するシフトを削除
+        for (final date in validDates) {
+          try {
+            final targetShift = currentShifts.firstWhere(
+              (s) => ShiftDateUtils.normalizeDate(s.date) == date && s.storeId == defaultStore.id,
+            );
+            ref.read(shiftDateProvider.notifier).removeDate(targetShift.uniqueKey);
+          } catch (e) {
+            // シフトが見つからない場合は何もしない
+          }
+        }
       } else {
         // 選択
         widget.tempSelectedDates.addAll(validDates);
@@ -394,10 +421,14 @@ class _DateSelectionPageState extends ConsumerState<_DateSelectionPage> {
             final uniqueKeys = <String>[];
 
             for (final date in newDates) {
-              final targetShift = updatedShifts.firstWhere(
-                (s) => ShiftDateUtils.normalizeDate(s.date) == date && s.storeId == defaultStore.id,
-              );
-              uniqueKeys.add(targetShift.uniqueKey);
+              try {
+                final targetShift = updatedShifts.firstWhere(
+                  (s) => ShiftDateUtils.normalizeDate(s.date) == date && s.storeId == defaultStore.id,
+                );
+                uniqueKeys.add(targetShift.uniqueKey);
+              } catch (e) {
+                // シフトが見つからない場合はスキップ
+              }
             }
 
             if (uniqueKeys.isNotEmpty) {
@@ -939,27 +970,8 @@ class _DateSelectionPageState extends ConsumerState<_DateSelectionPage> {
                   const Border(top: BorderSide(color: Colors.grey, width: 1)),
             ),
             child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              mainAxisAlignment: MainAxisAlignment.end,
               children: [
-                // ページインジケーター
-                Padding(
-                  padding: const EdgeInsets.only(left: 16),
-                  child: Row(
-                    children: List.generate(_generateMonthsList().length, (index) {
-                      return Container(
-                        margin: const EdgeInsets.symmetric(horizontal: 3),
-                        width: 8,
-                        height: 8,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: _currentPageIndex == index
-                              ? Colors.green
-                              : Colors.grey.shade400,
-                        ),
-                      );
-                    }),
-                  ),
-                ),
                 // 選択数表示と合計時間
                 Row(
                   mainAxisSize: MainAxisSize.min,
