@@ -1259,6 +1259,20 @@ class _TimeSettingListPageState extends ConsumerState<_TimeSettingListPage>
     return shiftDates.any((shift) => ShiftDateUtils.getWeekOfMonth(shift.date) == week);
   }
 
+  // 時間未設定のシフトをすべて選択
+  void _selectUnsetTimes() {
+    setState(() {
+      final shiftDates = ref.read(shiftDateProvider);
+      final unsetKeys = shiftDates
+          .where((shift) => shift.startTime == null || shift.endTime == null)
+          .map((s) => s.uniqueKey)
+          .toList();
+
+      _selectedUniqueKeys.clear();
+      _selectedUniqueKeys.addAll(unsetKeys);
+    });
+  }
+
   // 統計情報を計算
   Map<String, dynamic> _calculateStatistics(List<dynamic> shifts) {
     int totalDays = shifts.length;
@@ -1756,7 +1770,7 @@ class _TimeSettingListPageState extends ConsumerState<_TimeSettingListPage>
 
                 // 一括設定モード時のボタン
                 if (_isSelectionMode) ...[
-                  // 全選択、クリア、時間設定ボタン
+                  // 全選択、未設定選択、クリア、時間設定ボタン
                   Padding(
                     padding: const EdgeInsets.all(12),
                     child: Row(
@@ -1779,10 +1793,22 @@ class _TimeSettingListPageState extends ConsumerState<_TimeSettingListPage>
                                     shiftDates.length
                                 ? Icons.check_box
                                 : Icons.check_box_outline_blank),
-                            label: const Text('全選択', style: TextStyle(fontSize: 12)),
+                            label: const Text('全選択', style: TextStyle(fontSize: 11)),
                           ),
                         ),
-                        const SizedBox(width: 8),
+                        const SizedBox(width: 4),
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed: _selectUnsetTimes,
+                            icon: const Icon(Icons.schedule, size: 16),
+                            label: const Text('未設定', style: TextStyle(fontSize: 11)),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: Colors.orange,
+                              side: const BorderSide(color: Colors.orange),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 4),
                         Expanded(
                           child: OutlinedButton.icon(
                             onPressed: _selectedUniqueKeys.isEmpty
@@ -1793,7 +1819,7 @@ class _TimeSettingListPageState extends ConsumerState<_TimeSettingListPage>
                                     });
                                   },
                             icon: const Icon(Icons.clear, size: 16),
-                            label: const Text('クリア', style: TextStyle(fontSize: 12)),
+                            label: const Text('クリア', style: TextStyle(fontSize: 11)),
                             style: OutlinedButton.styleFrom(
                               foregroundColor: _selectedUniqueKeys.isEmpty
                                   ? null
@@ -1806,7 +1832,7 @@ class _TimeSettingListPageState extends ConsumerState<_TimeSettingListPage>
                             ),
                           ),
                         ),
-                        const SizedBox(width: 8),
+                        const SizedBox(width: 4),
                         Expanded(
                           flex: 2,
                           child: ElevatedButton.icon(
@@ -1816,7 +1842,7 @@ class _TimeSettingListPageState extends ConsumerState<_TimeSettingListPage>
                             icon: const Icon(Icons.access_time, size: 16),
                             label: Text(
                                 '時間設定 (${_selectedUniqueKeys.length})',
-                                style: const TextStyle(fontSize: 12)),
+                                style: const TextStyle(fontSize: 11)),
                             style: ElevatedButton.styleFrom(
                               backgroundColor: _selectedUniqueKeys.isEmpty
                                   ? null
