@@ -8,6 +8,7 @@ import '../utils/date_utils.dart';
 import '../utils/time_utils.dart';
 import '../constants/shift_constants.dart';
 import 'time_setting_screen.dart';
+import 'widgets/time_setting_modal.dart';
 
 /// シフト登録ウィザード（3ページ構成）
 /// Page 1: 日付選択
@@ -1076,7 +1077,7 @@ class _TimeSettingListPage extends ConsumerStatefulWidget {
 class _TimeSettingListPageState extends ConsumerState<_TimeSettingListPage>
     with SingleTickerProviderStateMixin {
   final Set<String> _selectedUniqueKeys = {};
-  bool _isSelectionMode = false;
+  bool _isBatchSelectionExpanded = false; // アコーディオンの開閉状態
   late AnimationController _blinkController;
   late Animation<double> _blinkAnimation;
 
@@ -1328,17 +1329,8 @@ class _TimeSettingListPageState extends ConsumerState<_TimeSettingListPage>
     };
   }
 
-  // 時間を分単位に変換（0-1439）
-  int _timeToMinutes(TimeOfDay time) {
-    return time.hour * 60 + time.minute;
-  }
 
-  // 分単位を時間に変換
-  TimeOfDay _minutesToTime(int minutes) {
-    return TimeOfDay(hour: (minutes ~/ 60) % 24, minute: minutes % 60);
-  }
-
-  void _showBatchTimeSettingDialog() {
+  void _showBatchTimeSettingDialog() async {
     if (_selectedUniqueKeys.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('日付を選択してください')),
@@ -1346,317 +1338,33 @@ class _TimeSettingListPageState extends ConsumerState<_TimeSettingListPage>
       return;
     }
 
-    // 初期値
-    double tempStartMinutes = 540.0; // 9:00
-    double tempEndMinutes = 1080.0; // 18:00
-
-    showDialog(
+    // 一括設定用のモーダルを表示
+    final result = await showDialog<TimeSettingResult>(
       context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setDialogState) {
-          TimeOfDay currentStartTime = _minutesToTime(tempStartMinutes.round());
-          TimeOfDay currentEndTime = _minutesToTime(tempEndMinutes.round() % 1440);
-
-          // 勤務時間を計算
-          int workingMinutes = (tempEndMinutes - tempStartMinutes).round();
-          int workingHours = workingMinutes ~/ 60;
-          int workingMins = workingMinutes % 60;
-
-          // 日をまたぐかどうか
-          bool crossesMidnight = tempEndMinutes >= 1440;
-
-          return AlertDialog(
-            title: Text('一括時間設定（${_selectedUniqueKeys.length}件）'),
-            content: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  // 時間範囲の視覚表示
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: Colors.blue[50],
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Column(
-                      children: [
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceAround,
-                          children: [
-                            Column(
-                              children: [
-                                const Text(
-                                  '開始',
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    color: Colors.grey,
-                                  ),
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  '${currentStartTime.hour.toString().padLeft(2, '0')}:${currentStartTime.minute.toString().padLeft(2, '0')}',
-                                  style: const TextStyle(
-                                    fontSize: 32,
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.green,
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const Icon(Icons.arrow_forward, size: 32, color: Colors.grey),
-                            Column(
-                              children: [
-                                Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    const Text(
-                                      '終了',
-                                      style: TextStyle(
-                                        fontSize: 12,
-                                        color: Colors.grey,
-                                      ),
-                                    ),
-                                    if (crossesMidnight) ...[
-                                      const SizedBox(width: 4),
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(
-                                          horizontal: 6,
-                                          vertical: 2,
-                                        ),
-                                        decoration: BoxDecoration(
-                                          color: Colors.orange[100],
-                                          borderRadius: BorderRadius.circular(4),
-                                        ),
-                                        child: Text(
-                                          '翌日',
-                                          style: TextStyle(
-                                            fontSize: 10,
-                                            color: Colors.orange[800],
-                                            fontWeight: FontWeight.bold,
-                                          ),
-                                        ),
-                                      ),
-                                    ],
-                                  ],
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  '${currentEndTime.hour.toString().padLeft(2, '0')}:${currentEndTime.minute.toString().padLeft(2, '0')}',
-                                  style: const TextStyle(
-                                    fontSize: 32,
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.red,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 12),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 8,
-                          ),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Text(
-                            '勤務時間: $workingHours時間${workingMins > 0 ? "$workingMins分" : ""}',
-                            style: TextStyle(
-                              fontSize: 16,
-                              color: Colors.blue[800],
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-
-                  // 開始時刻スライダー
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          const Icon(Icons.login, color: Colors.green, size: 20),
-                          const SizedBox(width: 8),
-                          const Text(
-                            '開始時刻',
-                            style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          const Spacer(),
-                          Text(
-                            '${currentStartTime.hour}:${currentStartTime.minute.toString().padLeft(2, '0')}',
-                            style: const TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.green,
-                            ),
-                          ),
-                        ],
-                      ),
-                      Slider(
-                        value: tempStartMinutes,
-                        min: 0,
-                        max: 1425, // 23:45まで（15分刻み）
-                        divisions: 95, // 24時間 × 4 (15分刻み) - 1
-                        activeColor: Colors.green,
-                        label: '${currentStartTime.hour}:${currentStartTime.minute.toString().padLeft(2, '0')}',
-                        onChanged: (value) {
-                          setDialogState(() {
-                            // 15分刻みに丸める
-                            tempStartMinutes = (value ~/ 15 * 15).toDouble();
-
-                            // 終了時刻が新しい範囲内に収まるように調整（最大12時間後）
-                            double newMax = tempStartMinutes + 720;
-                            if (tempEndMinutes > newMax) {
-                              tempEndMinutes = newMax;
-                            }
-
-                            // 終了時刻が開始時刻より前にならないように調整
-                            if (tempEndMinutes <= tempStartMinutes) {
-                              tempEndMinutes = tempStartMinutes + 60; // 最低1時間の勤務時間
-                            }
-                          });
-                        },
-                      ),
-                    ],
-                  ),
-
-                  const SizedBox(height: 16),
-
-                  // 終了時刻スライダー
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          const Icon(Icons.logout, color: Colors.red, size: 20),
-                          const SizedBox(width: 8),
-                          const Text(
-                            '終了時刻',
-                            style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          const Spacer(),
-                          Text(
-                            '${currentEndTime.hour}:${currentEndTime.minute.toString().padLeft(2, '0')}',
-                            style: const TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.red,
-                            ),
-                          ),
-                        ],
-                      ),
-                      Slider(
-                        value: tempEndMinutes,
-                        min: tempStartMinutes + 15, // 開始時刻の15分後から
-                        max: tempStartMinutes + 720, // 開始時刻から最大12時間後
-                        divisions: ((tempStartMinutes + 720 - tempStartMinutes - 15) ~/ 15).toInt(),
-                        activeColor: Colors.red,
-                        label: '${currentEndTime.hour}:${currentEndTime.minute.toString().padLeft(2, '0')}${crossesMidnight ? " (翌日)" : ""}',
-                        onChanged: (value) {
-                          setDialogState(() {
-                            // 15分刻みに丸める
-                            tempEndMinutes = (value ~/ 15 * 15).toDouble();
-                          });
-                        },
-                      ),
-                    ],
-                  ),
-
-                  const SizedBox(height: 16),
-
-                  // クイック設定
-                  const Text(
-                    'クイック設定',
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: [
-                      _buildBatchQuickSetButton(setDialogState, (start, end) {
-                        tempStartMinutes = _timeToMinutes(start).toDouble();
-                        tempEndMinutes = _timeToMinutes(end).toDouble();
-                      }, '9:00-18:00', 9, 0, 18, 0),
-                      _buildBatchQuickSetButton(setDialogState, (start, end) {
-                        tempStartMinutes = _timeToMinutes(start).toDouble();
-                        tempEndMinutes = _timeToMinutes(end).toDouble();
-                      }, '10:00-19:00', 10, 0, 19, 0),
-                      _buildBatchQuickSetButton(setDialogState, (start, end) {
-                        tempStartMinutes = _timeToMinutes(start).toDouble();
-                        tempEndMinutes = _timeToMinutes(end).toDouble();
-                      }, '13:00-22:00', 13, 0, 22, 0),
-                      _buildBatchQuickSetButton(setDialogState, (start, end) {
-                        tempStartMinutes = _timeToMinutes(start).toDouble();
-                        tempEndMinutes = _timeToMinutes(end).toDouble();
-                      }, '17:00-23:00', 17, 0, 23, 0),
-                      _buildBatchQuickSetButton(setDialogState, (start, end) {
-                        tempStartMinutes = _timeToMinutes(start).toDouble();
-                        // 深夜帯なので翌日扱い
-                        tempEndMinutes = (_timeToMinutes(end) + 1440).toDouble();
-                      }, '22:00-翌7:00', 22, 0, 7, 0),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text('キャンセル'),
-              ),
-              TextButton(
-                onPressed: () {
-                  final startTime = _minutesToTime(tempStartMinutes.round());
-                  final endTime = _minutesToTime(tempEndMinutes.round() % 1440);
-
-                  final startStr =
-                      '${startTime.hour.toString().padLeft(2, '0')}:${startTime.minute.toString().padLeft(2, '0')}';
-                  final endStr =
-                      '${endTime.hour.toString().padLeft(2, '0')}:${endTime.minute.toString().padLeft(2, '0')}';
-
-                  // 選択されたシフトに一括で時間を設定
-                  for (final uniqueKey in _selectedUniqueKeys) {
-                    ref
-                        .read(shiftDateProvider.notifier)
-                        .updateTime(uniqueKey, startStr, endStr);
-                  }
-
-                  setState(() {
-                    _selectedUniqueKeys.clear();
-                    _isSelectionMode = false;
-                  });
-
-                  Navigator.pop(context);
-
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                        content: Text('${_selectedUniqueKeys.length}件の時間を設定しました')),
-                  );
-                },
-                child: const Text('設定'),
-              ),
-            ],
-          );
-        },
+      builder: (context) => TimeSettingModal(
+        title: '一括時間設定（${_selectedUniqueKeys.length}件）',
+        showMemoField: true,
       ),
     );
+
+    if (result != null) {
+      // 選択されたシフトに一括で時間と備考を設定
+      ref.read(shiftDateProvider.notifier).updateMultipleTimesAndMemo(
+            _selectedUniqueKeys.toList(),
+            result.startTime,
+            result.endTime,
+            result.memo,
+          );
+
+      final count = _selectedUniqueKeys.length;
+      setState(() {
+        _selectedUniqueKeys.clear();
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('${count}件の時間を設定しました')),
+      );
+    }
   }
 
   @override
@@ -1664,41 +1372,42 @@ class _TimeSettingListPageState extends ConsumerState<_TimeSettingListPage>
     final shiftDates = ref.watch(shiftDateProvider);
     final stores = ref.watch(storeProvider);
     final stats = _calculateStatistics(shiftDates);
+    final hasUnsetTimes = shiftDates.any((s) => s.startTime == null || s.endTime == null);
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(_isSelectionMode
-            ? '${_selectedUniqueKeys.length}件選択中'
-            : '時間設定'),
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('時間設定', style: TextStyle(fontSize: 18)),
+            if (hasUnsetTimes)
+              const Text(
+                '⚠ 時間未設定の日あり',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Colors.red,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+          ],
+        ),
         backgroundColor: Theme.of(context).colorScheme.inversePrimary,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
           onPressed: widget.onPrevious,
         ),
         actions: [
-          if (_isSelectionMode)
-            IconButton(
-              icon: const Icon(Icons.close),
-              onPressed: () {
-                setState(() {
-                  _isSelectionMode = false;
-                  _selectedUniqueKeys.clear();
-                });
-              },
-              tooltip: '選択解除',
-            )
-          else
-            TextButton(
-              onPressed: widget.onNext,
-              child: const Text(
-                '次へ',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                ),
+          TextButton(
+            onPressed: widget.onNext,
+            child: const Text(
+              '次へ',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
               ),
             ),
+          ),
         ],
       ),
       body: shiftDates.isEmpty
@@ -1776,28 +1485,76 @@ class _TimeSettingListPageState extends ConsumerState<_TimeSettingListPage>
                   ),
                 ),
 
-                // 一括設定ボタン
-                if (!_isSelectionMode)
-                  Padding(
-                    padding: const EdgeInsets.all(12),
-                    child: ElevatedButton.icon(
-                      onPressed: () {
-                        setState(() {
-                          _isSelectionMode = true;
-                        });
-                      },
-                      icon: const Icon(Icons.playlist_add_check),
-                      label: const Text('一括時間設定'),
-                      style: ElevatedButton.styleFrom(
-                        minimumSize: const Size.fromHeight(50),
-                        backgroundColor: Colors.green,
-                        foregroundColor: Colors.white,
-                      ),
-                    ),
+                // 一括設定アコーディオン
+                Container(
+                  margin: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    border: Border.all(color: Colors.grey.shade300),
+                    borderRadius: BorderRadius.circular(8),
                   ),
+                  child: Column(
+                    children: [
+                      // アコーディオンヘッダー
+                      InkWell(
+                        onTap: () {
+                          setState(() {
+                            _isBatchSelectionExpanded = !_isBatchSelectionExpanded;
+                            if (!_isBatchSelectionExpanded) {
+                              _selectedUniqueKeys.clear();
+                            }
+                          });
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: _isBatchSelectionExpanded
+                                ? Colors.green.shade50
+                                : Colors.grey.shade50,
+                            borderRadius: _isBatchSelectionExpanded
+                                ? const BorderRadius.only(
+                                    topLeft: Radius.circular(8),
+                                    topRight: Radius.circular(8),
+                                  )
+                                : BorderRadius.circular(8),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(
+                                Icons.playlist_add_check,
+                                color: _isBatchSelectionExpanded
+                                    ? Colors.green
+                                    : Colors.grey[700],
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Text(
+                                  _isBatchSelectionExpanded
+                                      ? '一括時間設定 (${_selectedUniqueKeys.length}件選択中)'
+                                      : '一括時間設定',
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold,
+                                    color: _isBatchSelectionExpanded
+                                        ? Colors.green
+                                        : Colors.grey[700],
+                                  ),
+                                ),
+                              ),
+                              Icon(
+                                _isBatchSelectionExpanded
+                                    ? Icons.expand_less
+                                    : Icons.expand_more,
+                                color: _isBatchSelectionExpanded
+                                    ? Colors.green
+                                    : Colors.grey[700],
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
 
-                // 一括設定モード時のボタン
-                if (_isSelectionMode) ...[
+                      // アコーディオンコンテンツ
+                      if (_isBatchSelectionExpanded) ...[
                   // 全選択、未設定選択、クリア、時間設定ボタン
                   Padding(
                     padding: const EdgeInsets.all(12),
@@ -2021,7 +1778,10 @@ class _TimeSettingListPageState extends ConsumerState<_TimeSettingListPage>
                   ),
 
                   const SizedBox(height: 12),
-                ],
+                      ],
+                    ],
+                  ),
+                ),
 
                 // シフトリスト
                 Expanded(
@@ -2044,7 +1804,7 @@ class _TimeSettingListPageState extends ConsumerState<_TimeSettingListPage>
                             ? Colors.green.shade50
                             : Colors.white,
                         child: ListTile(
-                          leading: _isSelectionMode
+                          leading: _isBatchSelectionExpanded
                               ? Checkbox(
                                   value: isSelected,
                                   onChanged: (checked) {
@@ -2060,29 +1820,27 @@ class _TimeSettingListPageState extends ConsumerState<_TimeSettingListPage>
                                   },
                                   activeColor: Colors.green,
                                 )
-                              : CircleAvatar(
+                              : const CircleAvatar(
                                   backgroundColor: Colors.green,
-                                  child: Text(
-                                    shift.date.day.toString(),
-                                    style: const TextStyle(
-                                      color: Colors.white,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
+                                  radius: 20,
                                 ),
                           title: Text(
                             '${shift.date.year}/${shift.date.month}/${shift.date.day}',
                             style:
                                 const TextStyle(fontWeight: FontWeight.bold),
                           ),
-                          subtitle: shift.startTime != null && shift.endTime != null
-                              ? Text(
+                          subtitle: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              if (shift.startTime != null && shift.endTime != null)
+                                Text(
                                   '${shift.startTime} - ${shift.endTime}',
                                   style: const TextStyle(
                                     color: Colors.black87,
                                   ),
                                 )
-                              : AnimatedBuilder(
+                              else
+                                AnimatedBuilder(
                                   animation: _blinkAnimation,
                                   builder: (context, child) {
                                     return Opacity(
@@ -2097,10 +1855,23 @@ class _TimeSettingListPageState extends ConsumerState<_TimeSettingListPage>
                                     );
                                   },
                                 ),
-                          trailing: _isSelectionMode
+                              if (shift.memo != null && shift.memo!.isNotEmpty)
+                                Padding(
+                                  padding: const EdgeInsets.only(top: 4),
+                                  child: Text(
+                                    '備考: ${shift.memo}',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: Colors.grey[600],
+                                    ),
+                                  ),
+                                ),
+                            ],
+                          ),
+                          trailing: _isBatchSelectionExpanded
                               ? null
                               : const Icon(Icons.edit),
-                          onTap: _isSelectionMode
+                          onTap: _isBatchSelectionExpanded
                               ? () {
                                   setState(() {
                                     if (isSelected) {
@@ -2112,14 +1883,29 @@ class _TimeSettingListPageState extends ConsumerState<_TimeSettingListPage>
                                     }
                                   });
                                 }
-                              : () {
-                                  Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (context) => TimeSettingScreen(
-                                          uniqueKey: shift.uniqueKey),
+                              : () async {
+                                  // 個別設定用のモーダルを表示
+                                  final result = await showDialog<TimeSettingResult>(
+                                    context: context,
+                                    builder: (context) => TimeSettingModal(
+                                      title: '時間設定',
+                                      initialStartTime: shift.startTime,
+                                      initialEndTime: shift.endTime,
+                                      initialMemo: shift.memo,
+                                      showMemoField: true,
                                     ),
                                   );
+
+                                  if (result != null) {
+                                    ref
+                                        .read(shiftDateProvider.notifier)
+                                        .updateTimeAndMemo(
+                                          shift.uniqueKey,
+                                          result.startTime,
+                                          result.endTime,
+                                          result.memo,
+                                        );
+                                  }
                                 },
                         ),
                       );
@@ -2228,31 +2014,6 @@ class _TimeSettingListPageState extends ConsumerState<_TimeSettingListPage>
     );
   }
 
-  // 一括設定用クイック設定ボタン
-  Widget _buildBatchQuickSetButton(
-    StateSetter setDialogState,
-    Function(TimeOfDay, TimeOfDay) onSet,
-    String label,
-    int startHour,
-    int startMinute,
-    int endHour,
-    int endMinute,
-  ) {
-    return OutlinedButton(
-      onPressed: () {
-        setDialogState(() {
-          onSet(
-            TimeOfDay(hour: startHour, minute: startMinute),
-            TimeOfDay(hour: endHour, minute: endMinute),
-          );
-        });
-      },
-      style: OutlinedButton.styleFrom(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      ),
-      child: Text(label, style: const TextStyle(fontSize: 12)),
-    );
-  }
 }
 
 // ============================================================
