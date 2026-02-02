@@ -87,7 +87,7 @@ class _TimeSettingModalState extends ConsumerState<TimeSettingModal> {
   }
 
   // プリセット追加ダイアログを表示
-  void _showAddPresetDialog() {
+  void _showAddPresetDialog() async {
     final currentStartTime = _minutesToTime(tempStartMinutes.round());
     final currentEndTime = _minutesToTime(tempEndMinutes.round() % 1440);
     final bool crossesMidnight = tempEndMinutes >= 1440;
@@ -98,7 +98,7 @@ class _TimeSettingModalState extends ConsumerState<TimeSettingModal> {
           : '${currentStartTime.hour}:${currentStartTime.minute.toString().padLeft(2, '0')}-${currentEndTime.hour}:${currentEndTime.minute.toString().padLeft(2, '0')}',
     );
 
-    showDialog(
+    await showDialog(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('クイック設定に追加'),
@@ -145,6 +145,7 @@ class _TimeSettingModalState extends ConsumerState<TimeSettingModal> {
         ],
       ),
     );
+
     labelController.dispose();
   }
 
