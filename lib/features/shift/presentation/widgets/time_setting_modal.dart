@@ -396,22 +396,26 @@ class _TimeSettingModalState extends ConsumerState<TimeSettingModal> {
                     Positioned(
                       right: -8,
                       top: -8,
-                      child: GestureDetector(
-                        onTap: () {
-                          ref
-                              .read(timePresetProvider.notifier)
-                              .removePreset(preset.label);
-                        },
-                        child: Container(
-                          padding: const EdgeInsets.all(2),
-                          decoration: const BoxDecoration(
-                            color: Colors.red,
-                            shape: BoxShape.circle,
-                          ),
-                          child: const Icon(
-                            Icons.close,
-                            size: 14,
-                            color: Colors.white,
+                      child: Material(
+                        color: Colors.transparent,
+                        child: InkWell(
+                          onTap: () {
+                            ref
+                                .read(timePresetProvider.notifier)
+                                .removePreset(preset.label);
+                          },
+                          customBorder: const CircleBorder(),
+                          child: Container(
+                            padding: const EdgeInsets.all(2),
+                            decoration: const BoxDecoration(
+                              color: Colors.red,
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(
+                              Icons.close,
+                              size: 14,
+                              color: Colors.white,
+                            ),
                           ),
                         ),
                       ),

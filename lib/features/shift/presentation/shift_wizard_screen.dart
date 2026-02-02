@@ -1688,77 +1688,6 @@ class _TimeSettingListPageState extends ConsumerState<_TimeSettingListPage>
             )
           : Column(
               children: [
-                // 統計情報表示
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [
-                        Colors.green.shade100,
-                        Colors.green.shade50,
-                      ],
-                    ),
-                    border: const Border(
-                      bottom: BorderSide(color: Colors.grey, width: 1),
-                    ),
-                  ),
-                  child: Column(
-                    children: [
-                      if (hasUnsetTimes)
-                        FadeTransition(
-                          opacity: _blinkAnimation,
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                            margin: const EdgeInsets.only(bottom: 8),
-                            decoration: BoxDecoration(
-                              color: Colors.red.shade100,
-                              borderRadius: BorderRadius.circular(8),
-                              border: Border.all(color: Colors.red, width: 2),
-                            ),
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Icon(Icons.warning, color: Colors.red, size: 18),
-                                const SizedBox(width: 8),
-                                const Text(
-                                  '時間未設定の日あり',
-                                  style: TextStyle(
-                                    fontSize: 13,
-                                    color: Colors.red,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceAround,
-                        children: [
-                          _buildStatItem(
-                            Icons.calendar_today,
-                            '合計勤務日数',
-                            '${stats['totalDays']}日',
-                          ),
-                          _buildStatItem(
-                            Icons.access_time,
-                            '実労働時間',
-                            '${stats['totalActualHours'].toStringAsFixed(1)}時間',
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 6),
-                      Text(
-                        '※休憩時間を差し引いています（労働基準法に基づく）',
-                        style: TextStyle(
-                          fontSize: 10,
-                          color: Colors.grey[700],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-
                 // 一括設定アコーディオン
                 Container(
                   margin: const EdgeInsets.all(12),
@@ -2231,6 +2160,77 @@ class _TimeSettingListPageState extends ConsumerState<_TimeSettingListPage>
                     },
                   ),
                 ),
+
+                // 統計情報表示（下部固定）
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [
+                        Colors.green.shade100,
+                        Colors.green.shade50,
+                      ],
+                    ),
+                    border: const Border(
+                      top: BorderSide(color: Colors.grey, width: 1),
+                    ),
+                  ),
+                  child: Column(
+                    children: [
+                      if (hasUnsetTimes)
+                        FadeTransition(
+                          opacity: _blinkAnimation,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                            margin: const EdgeInsets.only(bottom: 8),
+                            decoration: BoxDecoration(
+                              color: Colors.red.shade100,
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: Colors.red, width: 2),
+                            ),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(Icons.warning, color: Colors.red, size: 18),
+                                const SizedBox(width: 8),
+                                const Text(
+                                  '時間未設定の日あり',
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    color: Colors.red,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceAround,
+                        children: [
+                          _buildStatItem(
+                            Icons.calendar_today,
+                            '合計勤務日数',
+                            '${stats['totalDays']}日',
+                          ),
+                          _buildStatItem(
+                            Icons.access_time,
+                            '実労働時間',
+                            '${stats['totalActualHours'].toStringAsFixed(1)}時間',
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        '※休憩時間を差し引いています（労働基準法に基づく）',
+                        style: TextStyle(
+                          fontSize: 10,
+                          color: Colors.grey[700],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               ],
             ),
     );
@@ -2449,7 +2449,20 @@ class _ConfirmationPageState extends ConsumerState<_ConfirmationPage>
             )
           : Column(
               children: [
-                // 統計情報表示
+                Expanded(
+                  child: ListView(
+                    padding: const EdgeInsets.all(16),
+                    children: groupedByMonth.entries.map((entry) {
+                      return _MonthAccordion(
+                        monthLabel: entry.key,
+                        shifts: entry.value,
+                        stores: stores,
+                      );
+                    }).toList(),
+                  ),
+                ),
+
+                // 統計情報表示（下部固定）
                 Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
@@ -2460,7 +2473,7 @@ class _ConfirmationPageState extends ConsumerState<_ConfirmationPage>
                       ],
                     ),
                     border: const Border(
-                      bottom: BorderSide(color: Colors.grey, width: 1),
+                      top: BorderSide(color: Colors.grey, width: 1),
                     ),
                   ),
                   child: Column(
@@ -2500,18 +2513,7 @@ class _ConfirmationPageState extends ConsumerState<_ConfirmationPage>
                   ),
                 ),
 
-                Expanded(
-                  child: ListView(
-                    padding: const EdgeInsets.all(16),
-                    children: groupedByMonth.entries.map((entry) {
-                      return _MonthAccordion(
-                        monthLabel: entry.key,
-                        shifts: entry.value,
-                        stores: stores,
-                      );
-                    }).toList(),
-                  ),
-                ),
+                // 提出ボタン
                 Container(
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
