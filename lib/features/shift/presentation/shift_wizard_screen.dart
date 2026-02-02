@@ -1854,7 +1854,36 @@ class _TimeSettingListPageState extends ConsumerState<_TimeSettingListPage>
                           ),
                           trailing: _isBatchSelectionExpanded
                               ? null
-                              : const Icon(Icons.edit),
+                              : IconButton(
+                                  icon: const Icon(Icons.delete, color: Colors.red),
+                                  onPressed: () {
+                                    // 削除確認ダイアログ
+                                    showDialog(
+                                      context: context,
+                                      builder: (context) => AlertDialog(
+                                        title: const Text('削除確認'),
+                                        content: Text(
+                                            '${shift.date.month}/${shift.date.day}のシフトを削除しますか？'),
+                                        actions: [
+                                          TextButton(
+                                            onPressed: () => Navigator.pop(context),
+                                            child: const Text('キャンセル'),
+                                          ),
+                                          TextButton(
+                                            onPressed: () {
+                                              ref
+                                                  .read(shiftDateProvider.notifier)
+                                                  .removeDate(shift.uniqueKey);
+                                              Navigator.pop(context);
+                                            },
+                                            child: const Text('削除',
+                                                style: TextStyle(color: Colors.red)),
+                                          ),
+                                        ],
+                                      ),
+                                    );
+                                  },
+                                ),
                           onTap: _isBatchSelectionExpanded
                               ? () {
                                   setState(() {

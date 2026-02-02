@@ -106,9 +106,6 @@ class _TimeSettingModalState extends ConsumerState<TimeSettingModal> {
     );
 
     ref.read(timePresetProvider.notifier).addPreset(preset);
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('「$label」をクイック設定に追加しました')),
-    );
   }
 
   @override
@@ -404,9 +401,6 @@ class _TimeSettingModalState extends ConsumerState<TimeSettingModal> {
                           ref
                               .read(timePresetProvider.notifier)
                               .removePreset(preset.label);
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text('「${preset.label}」を削除しました')),
-                          );
                         },
                         child: Container(
                           padding: const EdgeInsets.all(2),
