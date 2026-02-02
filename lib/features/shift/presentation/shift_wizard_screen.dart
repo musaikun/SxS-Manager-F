@@ -1561,6 +1561,7 @@ class _TimeSettingListPageState extends ConsumerState<_TimeSettingListPage>
                       // アコーディオンコンテンツ
                       ClipRect(
                         child: AnimatedAlign(
+                          alignment: Alignment.topCenter,
                           duration: const Duration(milliseconds: 500),
                           curve: Curves.easeInOutCubic,
                           heightFactor: _isBatchSelectionExpanded ? 1.0 : 0.0,
