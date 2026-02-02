@@ -368,6 +368,48 @@ class _DateSelectionPageState extends ConsumerState<_DateSelectionPage> {
       } else {
         // 選択
         widget.tempSelectedDates.addAll(validDates);
+
+        // プリセット選択中の場合、追加された日付に時間を設定
+        if (_selectedPreset != null) {
+          final defaultStore = ref.read(defaultStoreProvider);
+          final currentShifts = ref.read(shiftDateProvider);
+
+          // 新しく追加された日付のみ処理
+          final newDates = validDates.where((date) {
+            return !currentShifts.any((s) =>
+                ShiftDateUtils.normalizeDate(s.date) == date &&
+                s.storeId == defaultStore.id);
+          }).toList();
+
+          if (newDates.isNotEmpty) {
+            // 新規追加
+            ref.read(shiftDateProvider.notifier).addDates(newDates, defaultStore.id);
+
+            // 時間を設定
+            final startTime = '${_selectedPreset!.startHour.toString().padLeft(2, '0')}:${_selectedPreset!.startMinute.toString().padLeft(2, '0')}';
+            final endTime = '${_selectedPreset!.endHour.toString().padLeft(2, '0')}:${_selectedPreset!.endMinute.toString().padLeft(2, '0')}';
+
+            // 追加されたシフトのuniqueKeyを取得して時間を更新
+            final updatedShifts = ref.read(shiftDateProvider);
+            final uniqueKeys = <String>[];
+
+            for (final date in newDates) {
+              final targetShift = updatedShifts.firstWhere(
+                (s) => ShiftDateUtils.normalizeDate(s.date) == date && s.storeId == defaultStore.id,
+              );
+              uniqueKeys.add(targetShift.uniqueKey);
+            }
+
+            if (uniqueKeys.isNotEmpty) {
+              ref.read(shiftDateProvider.notifier).updateMultipleTimesAndMemo(
+                uniqueKeys,
+                startTime,
+                endTime,
+                null, // メモはnull
+              );
+            }
+          }
+        }
       }
     });
   }
@@ -409,6 +451,36 @@ class _DateSelectionPageState extends ConsumerState<_DateSelectionPage> {
     setState(() {
       widget.tempSelectedDates.clear();
     });
+  }
+
+  // 選択された日付の合計勤務時間を計算
+  String _calculateTotalHours() {
+    final defaultStore = ref.read(defaultStoreProvider);
+    final currentShifts = ref.read(shiftDateProvider);
+
+    double totalHours = 0.0;
+
+    for (final date in widget.tempSelectedDates) {
+      final shift = currentShifts.firstWhere(
+        (s) => ShiftDateUtils.normalizeDate(s.date) == date && s.storeId == defaultStore.id,
+        orElse: () => currentShifts.first, // ダミー
+      );
+
+      // 該当するシフトが見つかり、時間が設定されている場合
+      final hasShift = currentShifts.any(
+        (s) => ShiftDateUtils.normalizeDate(s.date) == date && s.storeId == defaultStore.id,
+      );
+
+      if (hasShift && shift.startTime != null && shift.endTime != null) {
+        final hours = TimeUtils.calculateWorkHours(
+          shift.startTime!,
+          shift.endTime!,
+        );
+        totalHours += hours;
+      }
+    }
+
+    return totalHours.toStringAsFixed(1);
   }
 
   // 該当する曜日が全て選択されているかチェック
@@ -886,7 +958,7 @@ class _DateSelectionPageState extends ConsumerState<_DateSelectionPage> {
                     }),
                   ),
                 ),
-                // 選択数表示
+                // 選択数表示と合計時間
                 Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
@@ -903,13 +975,30 @@ class _DateSelectionPageState extends ConsumerState<_DateSelectionPage> {
                       ),
                     ),
                     const SizedBox(width: 12),
-                    Text(
-                      '選択: ${widget.tempSelectedDates.length}日',
-                      style: const TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.black87,
-                      ),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          '選択: ${widget.tempSelectedDates.length}日',
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.black87,
+                          ),
+                        ),
+                        if (widget.tempSelectedDates.isNotEmpty) ...[
+                          const SizedBox(height: 2),
+                          Text(
+                            '合計: ${_calculateTotalHours()}時間',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.grey[700],
+                            ),
+                          ),
+                        ],
+                      ],
                     ),
                   ],
                 ),
@@ -1032,42 +1121,18 @@ class _DateSelectionPageState extends ConsumerState<_DateSelectionPage> {
             children: [
               Icon(Icons.access_time, size: 18, color: Colors.blue[700]),
               const SizedBox(width: 8),
-              Text(
-                'クイック設定（タップで時間を選択）',
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.blue[700],
+              Expanded(
+                child: Text(
+                  'クイック設定：時間を選択後、日付を選ぶと時間が自動設定されます',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.blue[700],
+                  ),
                 ),
               ),
             ],
           ),
-          if (_selectedPreset != null) ...[
-            const SizedBox(height: 8),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              decoration: BoxDecoration(
-                color: Colors.green[100],
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.green, width: 2),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(Icons.check_circle, size: 16, color: Colors.green[700]),
-                  const SizedBox(width: 6),
-                  Text(
-                    '${_selectedPreset!.label}を選択中',
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.green[700],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
           const SizedBox(height: 8),
           Wrap(
             spacing: 8,
