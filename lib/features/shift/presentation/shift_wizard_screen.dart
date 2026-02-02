@@ -168,9 +168,9 @@ class _ShiftWizardScreenState extends ConsumerState<ShiftWizardScreen> {
           children: [
             _buildIndicatorDot(0, '日付選択'),
             _buildIndicatorLine(0),
-            _buildIndicatorDot(1, '時間設定'),
+            _buildIndicatorDot(1, '確認・編集'),
             _buildIndicatorLine(1),
-            _buildIndicatorDot(2, '確認'),
+            _buildIndicatorDot(2, '提出'),
           ],
         ),
       ),
@@ -518,11 +518,6 @@ class _DateSelectionPageState extends ConsumerState<_DateSelectionPage> {
     final monthsList = _generateMonthsList();
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('出勤日を選択'),
-        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
-        automaticallyImplyLeading: false,
-      ),
       body: Column(
         children: [
           // クイック設定プリセット選択エリア
@@ -567,6 +562,26 @@ class _DateSelectionPageState extends ConsumerState<_DateSelectionPage> {
 
           const Divider(height: 1),
 
+          // 月表示ヘッダー（固定）
+          Container(
+            padding: const EdgeInsets.symmetric(vertical: 12),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              border: Border(
+                bottom: BorderSide(color: Colors.grey[300]!, width: 1),
+              ),
+            ),
+            child: Center(
+              child: Text(
+                '${widget.focusedDay.year}年${widget.focusedDay.month}月',
+                style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ),
+
           // カレンダー（縦PageView）
           Expanded(
             child: PageView.builder(
@@ -605,10 +620,7 @@ class _DateSelectionPageState extends ConsumerState<_DateSelectionPage> {
                       leftChevronVisible: false,
                       rightChevronVisible: false,
                       titleCentered: true,
-                      titleTextStyle: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                      ),
+                      headerVisible: false, // ヘッダーを非表示
                     ),
               calendarStyle: CalendarStyle(
                 // デフォルト（薄いグレーの背景）
@@ -1284,13 +1296,13 @@ class _TimeSettingListPageState extends ConsumerState<_TimeSettingListPage>
   @override
   void initState() {
     super.initState();
-    // ブリンクアニメーションの初期化（1.5秒周期でゆっくり点滅）
+    // ブリンクアニメーションの初期化（500ms周期で激しく点滅）
     _blinkController = AnimationController(
-      duration: const Duration(milliseconds: 1500),
+      duration: const Duration(milliseconds: 500),
       vsync: this,
     )..repeat(reverse: true);
 
-    _blinkAnimation = Tween<double>(begin: 0.3, end: 1.0).animate(
+    _blinkAnimation = Tween<double>(begin: 0.2, end: 1.0).animate(
       CurvedAnimation(parent: _blinkController, curve: Curves.easeInOut),
     );
 
@@ -1589,25 +1601,6 @@ class _TimeSettingListPageState extends ConsumerState<_TimeSettingListPage>
     final hasUnsetTimes = shiftDates.any((s) => s.startTime == null || s.endTime == null);
 
     return Scaffold(
-      appBar: AppBar(
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text('シフト確認・編集', style: TextStyle(fontSize: 18)),
-            if (hasUnsetTimes)
-              const Text(
-                '⚠ 時間未設定の日あり',
-                style: TextStyle(
-                  fontSize: 12,
-                  color: Colors.red,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-          ],
-        ),
-        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
-        automaticallyImplyLeading: false,
-      ),
       body: shiftDates.isEmpty
           ? Center(
               child: Column(
@@ -1642,7 +1635,7 @@ class _TimeSettingListPageState extends ConsumerState<_TimeSettingListPage>
               children: [
                 // 統計情報表示
                 Container(
-                  padding: const EdgeInsets.all(16),
+                  padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
                       colors: [
@@ -1656,6 +1649,34 @@ class _TimeSettingListPageState extends ConsumerState<_TimeSettingListPage>
                   ),
                   child: Column(
                     children: [
+                      if (hasUnsetTimes)
+                        FadeTransition(
+                          opacity: _blinkAnimation,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                            margin: const EdgeInsets.only(bottom: 8),
+                            decoration: BoxDecoration(
+                              color: Colors.red.shade100,
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: Colors.red, width: 2),
+                            ),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(Icons.warning, color: Colors.red, size: 18),
+                                const SizedBox(width: 8),
+                                const Text(
+                                  '時間未設定の日あり',
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    color: Colors.red,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceAround,
                         children: [
@@ -1671,11 +1692,11 @@ class _TimeSettingListPageState extends ConsumerState<_TimeSettingListPage>
                           ),
                         ],
                       ),
-                      const SizedBox(height: 8),
+                      const SizedBox(height: 6),
                       Text(
                         '※休憩時間を差し引いています（労働基準法に基づく）',
                         style: TextStyle(
-                          fontSize: 11,
+                          fontSize: 10,
                           color: Colors.grey[700],
                         ),
                       ),
@@ -2341,11 +2362,6 @@ class _ConfirmationPageState extends ConsumerState<_ConfirmationPage>
     }
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('確認・提出'),
-        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
-        automaticallyImplyLeading: false,
-      ),
       body: shiftDates.isEmpty
           ? Center(
               child: Column(
@@ -2380,7 +2396,7 @@ class _ConfirmationPageState extends ConsumerState<_ConfirmationPage>
               children: [
                 // 統計情報表示
                 Container(
-                  padding: const EdgeInsets.all(16),
+                  padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
                       colors: [
@@ -2397,11 +2413,11 @@ class _ConfirmationPageState extends ConsumerState<_ConfirmationPage>
                       const Text(
                         'シフト統計',
                         style: TextStyle(
-                          fontSize: 16,
+                          fontSize: 14,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
-                      const SizedBox(height: 12),
+                      const SizedBox(height: 8),
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceAround,
                         children: [
@@ -2417,11 +2433,11 @@ class _ConfirmationPageState extends ConsumerState<_ConfirmationPage>
                           ),
                         ],
                       ),
-                      const SizedBox(height: 8),
+                      const SizedBox(height: 6),
                       Text(
                         '※休憩時間を差し引いています（労働基準法に基づく）',
                         style: TextStyle(
-                          fontSize: 11,
+                          fontSize: 10,
                           color: Colors.grey[700],
                         ),
                       ),
