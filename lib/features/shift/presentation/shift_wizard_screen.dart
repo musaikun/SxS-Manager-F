@@ -3,7 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:table_calendar/table_calendar.dart';
 import '../providers/shift_date_provider.dart';
 import '../providers/store_provider.dart';
+import '../providers/time_preset_provider.dart';
 import '../domain/models/store.dart';
+import '../domain/models/time_preset.dart';
 import '../utils/date_utils.dart';
 import '../utils/time_utils.dart';
 import '../constants/shift_constants.dart';
@@ -272,6 +274,7 @@ class _DateSelectionPage extends ConsumerStatefulWidget {
 class _DateSelectionPageState extends ConsumerState<_DateSelectionPage> {
   late PageController _calendarPageController;
   int _currentPageIndex = 0;
+  TimePreset? _selectedPreset; // 選択中のクイック設定プリセット
 
   @override
   void initState() {
@@ -313,6 +316,45 @@ class _DateSelectionPageState extends ConsumerState<_DateSelectionPage> {
         widget.tempSelectedDates.remove(normalized);
       } else {
         widget.tempSelectedDates.add(normalized);
+
+        // プリセット選択中の場合、即座に時間も設定
+        if (_selectedPreset != null) {
+          final defaultStore = ref.read(defaultStoreProvider);
+          final currentShifts = ref.read(shiftDateProvider);
+
+          // 既存のシフトがあるか確認
+          final existingShift = currentShifts.firstWhere(
+            (s) => ShiftDateUtils.normalizeDate(s.date) == normalized && s.storeId == defaultStore.id,
+            orElse: () => currentShifts.first, // ダミー（実際には使われない）
+          );
+
+          // 既存のシフトがない場合のみ追加
+          final hasExistingShift = currentShifts.any(
+            (s) => ShiftDateUtils.normalizeDate(s.date) == normalized && s.storeId == defaultStore.id,
+          );
+
+          if (!hasExistingShift) {
+            // 新規追加
+            ref.read(shiftDateProvider.notifier).addDates([normalized], defaultStore.id);
+          }
+
+          // 時間を設定
+          final startTime = '${_selectedPreset!.startHour.toString().padLeft(2, '0')}:${_selectedPreset!.startMinute.toString().padLeft(2, '0')}';
+          final endTime = '${_selectedPreset!.endHour.toString().padLeft(2, '0')}:${_selectedPreset!.endMinute.toString().padLeft(2, '0')}';
+
+          // 追加されたシフトを取得してuniqueKeyで時間を更新
+          final updatedShifts = ref.read(shiftDateProvider);
+          final targetShift = updatedShifts.firstWhere(
+            (s) => ShiftDateUtils.normalizeDate(s.date) == normalized && s.storeId == defaultStore.id,
+          );
+
+          ref.read(shiftDateProvider.notifier).updateTimeAndMemo(
+            targetShift.uniqueKey,
+            startTime,
+            endTime,
+            null, // メモはnull
+          );
+        }
       }
     });
   }
@@ -483,6 +525,9 @@ class _DateSelectionPageState extends ConsumerState<_DateSelectionPage> {
       ),
       body: Column(
         children: [
+          // クイック設定プリセット選択エリア
+          _buildPresetSelection(),
+
           // アクションボタン（平日・全日・土日祝・クリア）
           _buildActionButtons(),
 
@@ -966,6 +1011,159 @@ class _DateSelectionPageState extends ConsumerState<_DateSelectionPage> {
     );
   }
 
+  // クイック設定プリセット選択エリア
+  Widget _buildPresetSelection() {
+    final presets = ref.watch(timePresetProvider);
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+      decoration: BoxDecoration(
+        color: Colors.blue[50],
+        border: Border(
+          bottom: BorderSide(color: Colors.blue[200]!, width: 1),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.access_time, size: 18, color: Colors.blue[700]),
+              const SizedBox(width: 8),
+              Text(
+                'クイック設定（タップで時間を選択）',
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.blue[700],
+                ),
+              ),
+            ],
+          ),
+          if (_selectedPreset != null) ...[
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: BoxDecoration(
+                color: Colors.green[100],
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.green, width: 2),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.check_circle, size: 16, color: Colors.green[700]),
+                  const SizedBox(width: 6),
+                  Text(
+                    '${_selectedPreset!.label}を選択中',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.green[700],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              ...presets.map((preset) {
+                final isSelected = _selectedPreset == preset;
+                return OutlinedButton(
+                  onPressed: () {
+                    setState(() {
+                      if (isSelected) {
+                        _selectedPreset = null; // 選択解除
+                      } else {
+                        _selectedPreset = preset;
+                      }
+                    });
+                  },
+                  style: OutlinedButton.styleFrom(
+                    backgroundColor: isSelected ? Colors.green[50] : Colors.white,
+                    side: BorderSide(
+                      color: isSelected ? Colors.green : Colors.grey,
+                      width: isSelected ? 2 : 1,
+                    ),
+                  ),
+                  child: Text(
+                    preset.label,
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                      color: isSelected ? Colors.green[700] : Colors.black,
+                    ),
+                  ),
+                );
+              }).toList(),
+              // 新規プリセット追加ボタン
+              OutlinedButton.icon(
+                onPressed: () async {
+                  final result = await showDialog<TimeSettingResult>(
+                    context: context,
+                    builder: (context) => const TimeSettingModal(
+                      title: '新しいクイック設定を追加',
+                      initialStartTime: null,
+                      initialEndTime: null,
+                      initialMemo: null,
+                      showMemoField: false, // メモ欄は非表示
+                    ),
+                  );
+
+                  if (result != null && result.startTime != null && result.endTime != null) {
+                    // 時間をパース
+                    final startParts = result.startTime!.split(':');
+                    final endParts = result.endTime!.split(':');
+                    final startHour = int.parse(startParts[0]);
+                    final startMinute = int.parse(startParts[1]);
+                    final endHour = int.parse(endParts[0]);
+                    final endMinute = int.parse(endParts[1]);
+
+                    // 翌日判定
+                    final startMinutes = startHour * 60 + startMinute;
+                    final endMinutes = endHour * 60 + endMinute;
+                    final isNextDay = endMinutes < startMinutes;
+
+                    // ラベル生成
+                    final label = isNextDay
+                        ? '$startHour:${startMinute.toString().padLeft(2, '0')}-翌$endHour:${endMinute.toString().padLeft(2, '0')}'
+                        : '$startHour:${startMinute.toString().padLeft(2, '0')}-$endHour:${endMinute.toString().padLeft(2, '0')}';
+
+                    // プリセット追加
+                    final preset = TimePreset(
+                      label: label,
+                      startHour: startHour,
+                      startMinute: startMinute,
+                      endHour: endHour,
+                      endMinute: endMinute,
+                      isNextDay: isNextDay,
+                    );
+
+                    ref.read(timePresetProvider.notifier).addPreset(preset);
+
+                    // 追加したプリセットを選択状態にする
+                    setState(() {
+                      _selectedPreset = preset;
+                    });
+                  }
+                },
+                icon: const Icon(Icons.add, size: 16),
+                label: const Text('新規', style: TextStyle(fontSize: 12)),
+                style: OutlinedButton.styleFrom(
+                  side: BorderSide(color: Colors.blue[700]!, width: 1),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildActionButtons() {
     final isWeekdaysSelected = _isWeekdaysFullySelected();
     final isAllDaysSelected = _isAllDaysFullySelected();
@@ -1395,7 +1593,7 @@ class _TimeSettingListPageState extends ConsumerState<_TimeSettingListPage>
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('時間設定', style: TextStyle(fontSize: 18)),
+            const Text('シフト確認・編集', style: TextStyle(fontSize: 18)),
             if (hasUnsetTimes)
               const Text(
                 '⚠ 時間未設定の日あり',
