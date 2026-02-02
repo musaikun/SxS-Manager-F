@@ -476,7 +476,9 @@ class _DateSelectionPageState extends ConsumerState<_DateSelectionPage> {
           shift.startTime!,
           shift.endTime!,
         );
-        totalHours += hours;
+        if (hours != null) {
+          totalHours += hours;
+        }
       }
     }
 
