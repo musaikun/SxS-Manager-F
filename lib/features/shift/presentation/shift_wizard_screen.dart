@@ -1075,11 +1075,13 @@ class _TimeSettingListPage extends ConsumerStatefulWidget {
 }
 
 class _TimeSettingListPageState extends ConsumerState<_TimeSettingListPage>
-    with SingleTickerProviderStateMixin {
+    with TickerProviderStateMixin {
   final Set<String> _selectedUniqueKeys = {};
   bool _isBatchSelectionExpanded = false; // アコーディオンの開閉状態
   late AnimationController _blinkController;
   late Animation<double> _blinkAnimation;
+  late AnimationController _accordionController;
+  late Animation<double> _accordionRotation;
 
   @override
   void initState() {
@@ -1093,11 +1095,22 @@ class _TimeSettingListPageState extends ConsumerState<_TimeSettingListPage>
     _blinkAnimation = Tween<double>(begin: 0.3, end: 1.0).animate(
       CurvedAnimation(parent: _blinkController, curve: Curves.easeInOut),
     );
+
+    // アコーディオンアニメーションの初期化
+    _accordionController = AnimationController(
+      duration: const Duration(milliseconds: 300),
+      vsync: this,
+    );
+
+    _accordionRotation = Tween<double>(begin: 0.0, end: 0.5).animate(
+      CurvedAnimation(parent: _accordionController, curve: Curves.easeInOut),
+    );
   }
 
   @override
   void dispose() {
     _blinkController.dispose();
+    _accordionController.dispose();
     super.dispose();
   }
 
@@ -1483,7 +1496,10 @@ class _TimeSettingListPageState extends ConsumerState<_TimeSettingListPage>
                         onTap: () {
                           setState(() {
                             _isBatchSelectionExpanded = !_isBatchSelectionExpanded;
-                            if (!_isBatchSelectionExpanded) {
+                            if (_isBatchSelectionExpanded) {
+                              _accordionController.forward();
+                            } else {
+                              _accordionController.reverse();
                               _selectedUniqueKeys.clear();
                             }
                           });
@@ -1524,13 +1540,15 @@ class _TimeSettingListPageState extends ConsumerState<_TimeSettingListPage>
                                   ),
                                 ),
                               ),
-                              Icon(
-                                _isBatchSelectionExpanded
-                                    ? Icons.expand_less
-                                    : Icons.expand_more,
-                                color: _isBatchSelectionExpanded
-                                    ? Colors.green
-                                    : Colors.grey[700],
+                              RotationTransition(
+                                turns: _accordionRotation,
+                                child: Icon(
+                                  Icons.arrow_drop_down,
+                                  size: 32,
+                                  color: _isBatchSelectionExpanded
+                                      ? Colors.green
+                                      : Colors.grey[700],
+                                ),
                               ),
                             ],
                           ),
@@ -1538,7 +1556,12 @@ class _TimeSettingListPageState extends ConsumerState<_TimeSettingListPage>
                       ),
 
                       // アコーディオンコンテンツ
-                      if (_isBatchSelectionExpanded) ...[
+                      AnimatedSize(
+                        duration: const Duration(milliseconds: 300),
+                        curve: Curves.easeInOut,
+                        child: _isBatchSelectionExpanded
+                            ? Column(
+                                children: [
                   // 全選択、未設定選択、クリア、時間設定ボタン
                   Padding(
                     padding: const EdgeInsets.all(12),
@@ -1762,7 +1785,10 @@ class _TimeSettingListPageState extends ConsumerState<_TimeSettingListPage>
                   ),
 
                   const SizedBox(height: 12),
-                      ],
+                                ],
+                              )
+                            : const SizedBox.shrink(),
+                      ),
                     ],
                   ),
                 ),
