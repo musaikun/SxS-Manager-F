@@ -150,7 +150,7 @@ class _ShiftWizardScreenState extends ConsumerState<ShiftWizardScreen> {
   // ページインジケーター
   Widget _buildPageIndicator() {
     return Container(
-      padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 24),
+      padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 24),
       decoration: BoxDecoration(
         color: Colors.white,
         boxShadow: [
@@ -184,17 +184,15 @@ class _ShiftWizardScreenState extends ConsumerState<ShiftWizardScreen> {
       onTap: () => _jumpToPage(page),
       borderRadius: BorderRadius.circular(20),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             Container(
-              width: 32,
-              height: 32,
+              width: 10,
+              height: 10,
               decoration: BoxDecoration(
-                color: isActive
-                    ? Theme.of(context).colorScheme.primary
-                    : Colors.grey[300],
+                color: isActive ? Colors.white : Colors.grey[400],
                 shape: BoxShape.circle,
                 boxShadow: isActive
                     ? [
@@ -202,29 +200,19 @@ class _ShiftWizardScreenState extends ConsumerState<ShiftWizardScreen> {
                           color: Theme.of(context)
                               .colorScheme
                               .primary
-                              .withOpacity(0.5),
-                          blurRadius: 12,
-                          spreadRadius: 2,
+                              .withOpacity(0.8),
+                          blurRadius: 8,
+                          spreadRadius: 3,
                         ),
                       ]
                     : null,
               ),
-              child: Center(
-                child: Text(
-                  '${page + 1}',
-                  style: TextStyle(
-                    color: isActive ? Colors.white : Colors.grey[600],
-                    fontWeight: FontWeight.bold,
-                    fontSize: 14,
-                  ),
-                ),
-              ),
             ),
-            const SizedBox(height: 4),
+            const SizedBox(height: 3),
             Text(
               label,
               style: TextStyle(
-                fontSize: 11,
+                fontSize: 10,
                 color: isActive
                     ? Theme.of(context).colorScheme.primary
                     : Colors.grey[600],
@@ -240,7 +228,7 @@ class _ShiftWizardScreenState extends ConsumerState<ShiftWizardScreen> {
   Widget _buildIndicatorLine(int index) {
     final isActive = _currentPage > index;
     return Container(
-      width: 40,
+      width: 30,
       height: 2,
       color: isActive
           ? Theme.of(context).colorScheme.primary
@@ -620,7 +608,9 @@ class _DateSelectionPageState extends ConsumerState<_DateSelectionPage> {
                       leftChevronVisible: false,
                       rightChevronVisible: false,
                       titleCentered: true,
-                      headerVisible: false, // ヘッダーを非表示
+                      headerMargin: EdgeInsets.zero,
+                      headerPadding: EdgeInsets.zero,
+                      titleTextStyle: TextStyle(fontSize: 0, height: 0),
                     ),
               calendarStyle: CalendarStyle(
                 // デフォルト（薄いグレーの背景）
