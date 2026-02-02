@@ -442,8 +442,8 @@ class _TimeSettingScreenState extends ConsumerState<TimeSettingScreen> {
                             // 15分刻みに丸める
                             tempStartMinutes = (value ~/ 15 * 15).toDouble();
 
-                            // 終了時刻が新しい範囲内に収まるように調整
-                            double newMax = tempStartMinutes + 1425;
+                            // 終了時刻が新しい範囲内に収まるように調整（最大12時間後）
+                            double newMax = tempStartMinutes + 720;
                             if (tempEndMinutes > newMax) {
                               tempEndMinutes = newMax;
                             }
@@ -489,8 +489,8 @@ class _TimeSettingScreenState extends ConsumerState<TimeSettingScreen> {
                       Slider(
                         value: tempEndMinutes,
                         min: tempStartMinutes + 15, // 開始時刻の15分後から
-                        max: tempStartMinutes + 1425, // 開始時刻から最大23時間45分後
-                        divisions: ((tempStartMinutes + 1425 - tempStartMinutes - 15) ~/ 15).toInt(),
+                        max: tempStartMinutes + 720, // 開始時刻から最大12時間後
+                        divisions: ((tempStartMinutes + 720 - tempStartMinutes - 15) ~/ 15).toInt(),
                         activeColor: Colors.red,
                         label: '${currentEndTime.hour}:${currentEndTime.minute.toString().padLeft(2, '0')}${crossesMidnight ? " (翌日)" : ""}',
                         onChanged: (value) {

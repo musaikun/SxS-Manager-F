@@ -95,4 +95,27 @@ class TimeUtils {
     final endMinutes = timeToMinutes(endTime);
     return endMinutes <= startMinutes;
   }
+
+  /// 労働基準法に基づく休憩時間を計算（分単位）
+  /// - 6時間未満：0分
+  /// - 6時間以上8時間未満：45分
+  /// - 8時間以上：60分
+  static int calculateBreakTime(double workHours) {
+    if (workHours < 6.0) {
+      return 0;
+    } else if (workHours < 8.0) {
+      return 45;
+    } else {
+      return 60;
+    }
+  }
+
+  /// 実労働時間を計算（休憩時間を差し引いた時間）
+  static double? calculateActualWorkHours(String? startTime, String? endTime) {
+    final totalHours = calculateWorkHours(startTime, endTime);
+    if (totalHours == null) return null;
+
+    final breakMinutes = calculateBreakTime(totalHours);
+    return totalHours - (breakMinutes / 60.0);
+  }
 }

@@ -430,6 +430,14 @@ class _DateSelectionPageState extends ConsumerState<_DateSelectionPage> {
     return validDates.every((d) => widget.tempSelectedDates.contains(d));
   }
 
+  // 第〇週が存在するかチェック（過去日を除く）
+  bool _hasWeekOfMonth(int week) {
+    final dates = _getDatesInMonth((day) => ShiftDateUtils.getWeekOfMonth(day) == week);
+    final today = ShiftDateUtils.normalizeDate(DateTime.now());
+    final validDates = dates.where((d) => !d.isBefore(today)).toList();
+    return validDates.isNotEmpty;
+  }
+
   // 該当日付のシフト情報を取得
   String? _getTimeInfo(DateTime day) {
     final normalized = ShiftDateUtils.normalizeDate(day);
@@ -922,16 +930,19 @@ class _DateSelectionPageState extends ConsumerState<_DateSelectionPage> {
         children: List.generate(5, (index) {
           final week = index + 1; // 第1週〜第5週
           final isFullySelected = _isWeekOfMonthFullySelected(week);
+          final hasWeek = _hasWeekOfMonth(week);
 
           return Expanded(
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 2),
               child: OutlinedButton(
-                onPressed: () => _toggleWeekOfMonth(week),
+                onPressed: hasWeek ? () => _toggleWeekOfMonth(week) : null,
                 style: OutlinedButton.styleFrom(
                   padding: const EdgeInsets.symmetric(vertical: 6),
                   side: BorderSide(
-                    color: isFullySelected ? Colors.green : Colors.grey,
+                    color: !hasWeek
+                        ? Colors.grey.shade300
+                        : (isFullySelected ? Colors.green : Colors.grey),
                   ),
                   backgroundColor: isFullySelected ? Colors.green : null,
                   minimumSize: const Size(0, 0),
@@ -940,7 +951,9 @@ class _DateSelectionPageState extends ConsumerState<_DateSelectionPage> {
                   '第${week}週',
                   style: TextStyle(
                     fontSize: 11,
-                    color: isFullySelected ? Colors.white : Colors.black,
+                    color: !hasWeek
+                        ? Colors.grey.shade400
+                        : (isFullySelected ? Colors.white : Colors.black),
                     fontWeight: FontWeight.bold,
                   ),
                 ),
@@ -1250,12 +1263,17 @@ class _TimeSettingListPageState extends ConsumerState<_TimeSettingListPage>
   Map<String, dynamic> _calculateStatistics(List<dynamic> shifts) {
     int totalDays = shifts.length;
     double totalHours = 0;
+    double totalActualHours = 0; // 休憩時間を差し引いた実労働時間
     int daysWithTime = 0;
 
     for (final shift in shifts) {
       final hours = TimeUtils.calculateWorkHours(shift.startTime, shift.endTime);
       if (hours != null) {
         totalHours += hours;
+        final actualHours = TimeUtils.calculateActualWorkHours(shift.startTime, shift.endTime);
+        if (actualHours != null) {
+          totalActualHours += actualHours;
+        }
         daysWithTime++;
       }
     }
@@ -1263,6 +1281,7 @@ class _TimeSettingListPageState extends ConsumerState<_TimeSettingListPage>
     return {
       'totalDays': totalDays,
       'totalHours': totalHours,
+      'totalActualHours': totalActualHours,
       'daysWithTime': daysWithTime,
     };
   }
@@ -1453,8 +1472,8 @@ class _TimeSettingListPageState extends ConsumerState<_TimeSettingListPage>
                             // 15分刻みに丸める
                             tempStartMinutes = (value ~/ 15 * 15).toDouble();
 
-                            // 終了時刻が新しい範囲内に収まるように調整
-                            double newMax = tempStartMinutes + 1425;
+                            // 終了時刻が新しい範囲内に収まるように調整（最大12時間後）
+                            double newMax = tempStartMinutes + 720;
                             if (tempEndMinutes > newMax) {
                               tempEndMinutes = newMax;
                             }
@@ -1500,8 +1519,8 @@ class _TimeSettingListPageState extends ConsumerState<_TimeSettingListPage>
                       Slider(
                         value: tempEndMinutes,
                         min: tempStartMinutes + 15, // 開始時刻の15分後から
-                        max: tempStartMinutes + 1425, // 開始時刻から最大23時間45分後
-                        divisions: ((tempStartMinutes + 1425 - tempStartMinutes - 15) ~/ 15).toInt(),
+                        max: tempStartMinutes + 720, // 開始時刻から最大12時間後
+                        divisions: ((tempStartMinutes + 720 - tempStartMinutes - 15) ~/ 15).toInt(),
                         activeColor: Colors.red,
                         label: '${currentEndTime.hour}:${currentEndTime.minute.toString().padLeft(2, '0')}${crossesMidnight ? " (翌日)" : ""}',
                         onChanged: (value) {
@@ -1686,18 +1705,30 @@ class _TimeSettingListPageState extends ConsumerState<_TimeSettingListPage>
                       bottom: BorderSide(color: Colors.grey, width: 1),
                     ),
                   ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceAround,
+                  child: Column(
                     children: [
-                      _buildStatItem(
-                        Icons.calendar_today,
-                        '合計勤務日数',
-                        '${stats['totalDays']}日',
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceAround,
+                        children: [
+                          _buildStatItem(
+                            Icons.calendar_today,
+                            '合計勤務日数',
+                            '${stats['totalDays']}日',
+                          ),
+                          _buildStatItem(
+                            Icons.access_time,
+                            '実労働時間',
+                            '${stats['totalActualHours'].toStringAsFixed(1)}時間',
+                          ),
+                        ],
                       ),
-                      _buildStatItem(
-                        Icons.access_time,
-                        '合計勤務時間',
-                        '${stats['totalHours'].toStringAsFixed(1)}時間',
+                      const SizedBox(height: 8),
+                      Text(
+                        '※休憩時間を差し引いています（労働基準法に基づく）',
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: Colors.grey[700],
+                        ),
                       ),
                     ],
                   ),
@@ -2202,12 +2233,17 @@ class _ConfirmationPageState extends ConsumerState<_ConfirmationPage>
   Map<String, dynamic> _calculateStatistics(List<dynamic> shifts) {
     int totalDays = shifts.length;
     double totalHours = 0;
+    double totalActualHours = 0; // 休憩時間を差し引いた実労働時間
     int daysWithTime = 0;
 
     for (final shift in shifts) {
       final hours = TimeUtils.calculateWorkHours(shift.startTime, shift.endTime);
       if (hours != null) {
         totalHours += hours;
+        final actualHours = TimeUtils.calculateActualWorkHours(shift.startTime, shift.endTime);
+        if (actualHours != null) {
+          totalActualHours += actualHours;
+        }
         daysWithTime++;
       }
     }
@@ -2215,6 +2251,7 @@ class _ConfirmationPageState extends ConsumerState<_ConfirmationPage>
     return {
       'totalDays': totalDays,
       'totalHours': totalHours,
+      'totalActualHours': totalActualHours,
       'daysWithTime': daysWithTime,
     };
   }
@@ -2308,10 +2345,18 @@ class _ConfirmationPageState extends ConsumerState<_ConfirmationPage>
                           ),
                           _buildStatItem(
                             Icons.access_time,
-                            '合計勤務時間',
-                            '${stats['totalHours'].toStringAsFixed(1)}時間',
+                            '実労働時間',
+                            '${stats['totalActualHours'].toStringAsFixed(1)}時間',
                           ),
                         ],
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        '※休憩時間を差し引いています（労働基準法に基づく）',
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: Colors.grey[700],
+                        ),
                       ),
                     ],
                   ),
