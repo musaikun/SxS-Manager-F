@@ -111,7 +111,7 @@ class _HomeScreenState extends State<HomeScreen> {
             // カレンダースタイル
             calendarStyle: CalendarStyle(
               todayDecoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.primary.withOpacity(0.3),
+                color: Theme.of(context).colorScheme.primary.withValues(alpha:0.3),
                 shape: BoxShape.circle,
               ),
               selectedDecoration: BoxDecoration(

@@ -259,7 +259,6 @@ class _DateSelectionPage extends ConsumerStatefulWidget {
 
 class _DateSelectionPageState extends ConsumerState<_DateSelectionPage> {
   late PageController _calendarPageController;
-  int _currentPageIndex = 0;
   TimePreset? _selectedPreset; // 選択中のクイック設定プリセット
 
   @override
@@ -681,9 +680,6 @@ class _DateSelectionPageState extends ConsumerState<_DateSelectionPage> {
               itemCount: monthsList.length,
               onPageChanged: (index) {
                 final newMonth = monthsList[index];
-                setState(() {
-                  _currentPageIndex = index;
-                });
                 // focusedDayを現在の月に更新（一括選択ボタンが正しく動作するように）
                 widget.onFocusedDayChanged(newMonth);
               },
@@ -1663,7 +1659,6 @@ class _TimeSettingListPageState extends ConsumerState<_TimeSettingListPage>
   @override
   Widget build(BuildContext context) {
     final shiftDates = ref.watch(shiftDateProvider);
-    final stores = ref.watch(storeProvider);
     final stats = _calculateStatistics(shiftDates);
     final hasUnsetTimes = shiftDates.any((s) => s.startTime == null || s.endTime == null);
 
@@ -2358,30 +2353,7 @@ class _ConfirmationPage extends ConsumerStatefulWidget {
   ConsumerState<_ConfirmationPage> createState() => _ConfirmationPageState();
 }
 
-class _ConfirmationPageState extends ConsumerState<_ConfirmationPage>
-    with SingleTickerProviderStateMixin {
-  late AnimationController _blinkController;
-  late Animation<double> _blinkAnimation;
-
-  @override
-  void initState() {
-    super.initState();
-    // ブリンクアニメーションの初期化（1.5秒周期でゆっくり点滅）
-    _blinkController = AnimationController(
-      duration: const Duration(milliseconds: 1500),
-      vsync: this,
-    )..repeat(reverse: true);
-
-    _blinkAnimation = Tween<double>(begin: 0.3, end: 1.0).animate(
-      CurvedAnimation(parent: _blinkController, curve: Curves.easeInOut),
-    );
-  }
-
-  @override
-  void dispose() {
-    _blinkController.dispose();
-    super.dispose();
-  }
+class _ConfirmationPageState extends ConsumerState<_ConfirmationPage> {
 
   // 統計情報を計算
   Map<String, dynamic> _calculateStatistics(List<dynamic> shifts) {
