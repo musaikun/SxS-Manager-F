@@ -34,10 +34,6 @@ class _ShiftWizardScreenState extends ConsumerState<ShiftWizardScreen> {
     super.dispose();
   }
 
-  DateTime _normalizeDate(DateTime date) {
-    return DateTime.utc(date.year, date.month, date.day);
-  }
-
   // ページ変更時の処理（重要：状態同期）
   void _syncDateSelectionToProvider() {
     // デフォルト店舗を取得
@@ -48,7 +44,7 @@ class _ShiftWizardScreenState extends ConsumerState<ShiftWizardScreen> {
     final Map<DateTime, dynamic> existingShifts = {};
     for (final shift in currentShifts) {
       if (shift.storeId == defaultStore.id) {
-        final normalized = _normalizeDate(shift.date);
+        final normalized = ShiftDateUtils.normalizeDate(shift.date);
         existingShifts[normalized] = shift;
       }
     }
@@ -288,78 +284,30 @@ class _DateSelectionPageState extends ConsumerState<_DateSelectionPage> {
     super.dispose();
   }
 
-  // 2025-2026年の祝日リスト（日本）
-  final Map<DateTime, String> _holidays = {
-    DateTime.utc(2025, 1, 1): '元日',
-    DateTime.utc(2025, 1, 13): '成人の日',
-    DateTime.utc(2025, 2, 11): '建国記念の日',
-    DateTime.utc(2025, 2, 23): '天皇誕生日',
-    DateTime.utc(2025, 2, 24): '振替休日',
-    DateTime.utc(2025, 3, 20): '春分の日',
-    DateTime.utc(2025, 4, 29): '昭和の日',
-    DateTime.utc(2025, 5, 3): '憲法記念日',
-    DateTime.utc(2025, 5, 4): 'みどりの日',
-    DateTime.utc(2025, 5, 5): 'こどもの日',
-    DateTime.utc(2025, 5, 6): '振替休日',
-    DateTime.utc(2025, 7, 21): '海の日',
-    DateTime.utc(2025, 8, 11): '山の日',
-    DateTime.utc(2025, 9, 15): '敬老の日',
-    DateTime.utc(2025, 9, 23): '秋分の日',
-    DateTime.utc(2025, 10, 13): 'スポーツの日',
-    DateTime.utc(2025, 11, 3): '文化の日',
-    DateTime.utc(2025, 11, 23): '勤労感謝の日',
-    DateTime.utc(2025, 11, 24): '振替休日',
-    DateTime.utc(2026, 1, 1): '元日',
-    DateTime.utc(2026, 1, 12): '成人の日',
-    DateTime.utc(2026, 2, 11): '建国記念の日',
-    DateTime.utc(2026, 2, 23): '天皇誕生日',
-    DateTime.utc(2026, 3, 20): '春分の日',
-    DateTime.utc(2026, 4, 29): '昭和の日',
-    DateTime.utc(2026, 5, 3): '憲法記念日',
-    DateTime.utc(2026, 5, 4): 'みどりの日',
-    DateTime.utc(2026, 5, 5): 'こどもの日',
-    DateTime.utc(2026, 5, 6): '振替休日',
-    DateTime.utc(2026, 7, 20): '海の日',
-    DateTime.utc(2026, 8, 11): '山の日',
-    DateTime.utc(2026, 9, 21): '敬老の日',
-    DateTime.utc(2026, 9, 22): '国民の休日',
-    DateTime.utc(2026, 9, 23): '秋分の日',
-    DateTime.utc(2026, 10, 12): 'スポーツの日',
-    DateTime.utc(2026, 11, 3): '文化の日',
-    DateTime.utc(2026, 11, 23): '勤労感謝の日',
-  };
-
-  DateTime _normalizeDate(DateTime date) {
-    return DateTime.utc(date.year, date.month, date.day);
-  }
-
   bool _isSelected(DateTime day) {
-    final normalized = _normalizeDate(day);
+    final normalized = ShiftDateUtils.normalizeDate(day);
     return widget.tempSelectedDates.contains(normalized);
   }
 
   bool _isHoliday(DateTime day) {
-    final normalized = _normalizeDate(day);
-    return _holidays.containsKey(normalized);
+    return JapaneseHolidays.isHoliday(day);
   }
 
   bool _isWeekendOrHoliday(DateTime day) {
-    return day.weekday == DateTime.saturday ||
-        day.weekday == DateTime.sunday ||
-        _isHoliday(day);
+    return ShiftDateUtils.isWeekendOrHoliday(day);
   }
 
   bool _isWeekday(DateTime day) {
-    return !_isWeekendOrHoliday(day);
+    return ShiftDateUtils.isWeekday(day);
   }
 
   // 日付の選択/解除（トグル）
   void _toggleDate(DateTime day) {
-    final today = _normalizeDate(DateTime.now());
-    if (_normalizeDate(day).isBefore(today)) return;
+    final today = ShiftDateUtils.normalizeDate(DateTime.now());
+    if (ShiftDateUtils.normalizeDate(day).isBefore(today)) return;
 
     setState(() {
-      final normalized = _normalizeDate(day);
+      final normalized = ShiftDateUtils.normalizeDate(day);
       if (widget.tempSelectedDates.contains(normalized)) {
         widget.tempSelectedDates.remove(normalized);
       } else {
@@ -372,7 +320,7 @@ class _DateSelectionPageState extends ConsumerState<_DateSelectionPage> {
   void _toggleDatesWhere(bool Function(DateTime) condition) {
     setState(() {
       final dates = _getDatesInMonth(condition);
-      final today = _normalizeDate(DateTime.now());
+      final today = ShiftDateUtils.normalizeDate(DateTime.now());
 
       // 過去日付を除外（表示されている月でも過去は選択不可）
       final validDates = dates.where((d) => !d.isBefore(today)).toList();
@@ -404,7 +352,7 @@ class _DateSelectionPageState extends ConsumerState<_DateSelectionPage> {
     for (int i = 0; i < lastDay.day; i++) {
       final day = firstDay.add(Duration(days: i));
       if (condition(day)) {
-        dates.add(_normalizeDate(day));
+        dates.add(ShiftDateUtils.normalizeDate(day));
       }
     }
     return dates;
@@ -435,7 +383,7 @@ class _DateSelectionPageState extends ConsumerState<_DateSelectionPage> {
   // 該当する曜日が全て選択されているかチェック
   bool _isWeekdayFullySelected(int weekday) {
     final dates = _getDatesInMonth((day) => day.weekday == weekday);
-    final today = _normalizeDate(DateTime.now());
+    final today = ShiftDateUtils.normalizeDate(DateTime.now());
     final validDates = dates.where((d) => !d.isBefore(today)).toList();
     if (validDates.isEmpty) return false;
     return validDates.every((d) => widget.tempSelectedDates.contains(d));
@@ -444,7 +392,7 @@ class _DateSelectionPageState extends ConsumerState<_DateSelectionPage> {
   // 平日が全て選択されているかチェック
   bool _isWeekdaysFullySelected() {
     final dates = _getDatesInMonth(_isWeekday);
-    final today = _normalizeDate(DateTime.now());
+    final today = ShiftDateUtils.normalizeDate(DateTime.now());
     final validDates = dates.where((d) => !d.isBefore(today)).toList();
     if (validDates.isEmpty) return false;
     return validDates.every((d) => widget.tempSelectedDates.contains(d));
@@ -453,7 +401,7 @@ class _DateSelectionPageState extends ConsumerState<_DateSelectionPage> {
   // 土日祝が全て選択されているかチェック
   bool _isWeekendsAndHolidaysFullySelected() {
     final dates = _getDatesInMonth(_isWeekendOrHoliday);
-    final today = _normalizeDate(DateTime.now());
+    final today = ShiftDateUtils.normalizeDate(DateTime.now());
     final validDates = dates.where((d) => !d.isBefore(today)).toList();
     if (validDates.isEmpty) return false;
     return validDates.every((d) => widget.tempSelectedDates.contains(d));
@@ -462,28 +410,21 @@ class _DateSelectionPageState extends ConsumerState<_DateSelectionPage> {
   // 全日が選択されているかチェック
   bool _isAllDaysFullySelected() {
     final dates = _getDatesInMonth((day) => true);
-    final today = _normalizeDate(DateTime.now());
+    final today = ShiftDateUtils.normalizeDate(DateTime.now());
     final validDates = dates.where((d) => !d.isBefore(today)).toList();
     if (validDates.isEmpty) return false;
     return validDates.every((d) => widget.tempSelectedDates.contains(d));
   }
 
-  // 月の第〇週を取得
-  int _getWeekOfMonth(DateTime date) {
-    final firstDayOfMonth = DateTime(date.year, date.month, 1);
-    final daysSinceFirstDay = date.difference(firstDayOfMonth).inDays;
-    return (daysSinceFirstDay / 7).floor() + 1;
-  }
-
   // 第〇週の日付をトグル選択
   void _toggleWeekOfMonth(int week) {
-    _toggleDatesWhere((day) => _getWeekOfMonth(day) == week);
+    _toggleDatesWhere((day) => ShiftDateUtils.getWeekOfMonth(day) == week);
   }
 
   // 第〇週が全て選択されているかチェック
   bool _isWeekOfMonthFullySelected(int week) {
-    final dates = _getDatesInMonth((day) => _getWeekOfMonth(day) == week);
-    final today = _normalizeDate(DateTime.now());
+    final dates = _getDatesInMonth((day) => ShiftDateUtils.getWeekOfMonth(day) == week);
+    final today = ShiftDateUtils.normalizeDate(DateTime.now());
     final validDates = dates.where((d) => !d.isBefore(today)).toList();
     if (validDates.isEmpty) return false;
     return validDates.every((d) => widget.tempSelectedDates.contains(d));
@@ -491,12 +432,12 @@ class _DateSelectionPageState extends ConsumerState<_DateSelectionPage> {
 
   // 該当日付のシフト情報を取得
   String? _getTimeInfo(DateTime day) {
-    final normalized = _normalizeDate(day);
+    final normalized = ShiftDateUtils.normalizeDate(day);
     final shiftDates = ref.read(shiftDateProvider);
 
     // 該当する日付のシフトを探す
     for (final shift in shiftDates) {
-      final shiftDate = _normalizeDate(shift.date);
+      final shiftDate = ShiftDateUtils.normalizeDate(shift.date);
       if (shiftDate == normalized) {
         // 時間が設定されている場合のみ表示
         if (shift.startTime != null && shift.endTime != null) {
@@ -599,8 +540,8 @@ class _DateSelectionPageState extends ConsumerState<_DateSelectionPage> {
                     availableGestures: AvailableGestures.none,
                     selectedDayPredicate: (day) => _isSelected(day),
                     enabledDayPredicate: (day) {
-                      final today = _normalizeDate(DateTime.now());
-                      return !_normalizeDate(day).isBefore(today);
+                      final today = ShiftDateUtils.normalizeDate(DateTime.now());
+                      return !ShiftDateUtils.normalizeDate(day).isBefore(today);
                     },
                     onDaySelected: (selectedDay, focusedDay) {
                       _toggleDate(selectedDay);
@@ -1126,47 +1067,6 @@ class _TimeSettingListPageState extends ConsumerState<_TimeSettingListPage>
   late AnimationController _blinkController;
   late Animation<double> _blinkAnimation;
 
-  // 2025-2026年の祝日リスト（日本）
-  final Map<DateTime, String> _holidays = {
-    DateTime.utc(2025, 1, 1): '元日',
-    DateTime.utc(2025, 1, 13): '成人の日',
-    DateTime.utc(2025, 2, 11): '建国記念の日',
-    DateTime.utc(2025, 2, 23): '天皇誕生日',
-    DateTime.utc(2025, 2, 24): '振替休日',
-    DateTime.utc(2025, 3, 20): '春分の日',
-    DateTime.utc(2025, 4, 29): '昭和の日',
-    DateTime.utc(2025, 5, 3): '憲法記念日',
-    DateTime.utc(2025, 5, 4): 'みどりの日',
-    DateTime.utc(2025, 5, 5): 'こどもの日',
-    DateTime.utc(2025, 5, 6): '振替休日',
-    DateTime.utc(2025, 7, 21): '海の日',
-    DateTime.utc(2025, 8, 11): '山の日',
-    DateTime.utc(2025, 9, 15): '敬老の日',
-    DateTime.utc(2025, 9, 23): '秋分の日',
-    DateTime.utc(2025, 10, 13): 'スポーツの日',
-    DateTime.utc(2025, 11, 3): '文化の日',
-    DateTime.utc(2025, 11, 23): '勤労感謝の日',
-    DateTime.utc(2025, 11, 24): '振替休日',
-    DateTime.utc(2026, 1, 1): '元日',
-    DateTime.utc(2026, 1, 12): '成人の日',
-    DateTime.utc(2026, 2, 11): '建国記念の日',
-    DateTime.utc(2026, 2, 23): '天皇誕生日',
-    DateTime.utc(2026, 3, 20): '春分の日',
-    DateTime.utc(2026, 4, 29): '昭和の日',
-    DateTime.utc(2026, 5, 3): '憲法記念日',
-    DateTime.utc(2026, 5, 4): 'みどりの日',
-    DateTime.utc(2026, 5, 5): 'こどもの日',
-    DateTime.utc(2026, 5, 6): '振替休日',
-    DateTime.utc(2026, 7, 20): '海の日',
-    DateTime.utc(2026, 8, 11): '山の日',
-    DateTime.utc(2026, 9, 21): '敬老の日',
-    DateTime.utc(2026, 9, 22): '国民の休日',
-    DateTime.utc(2026, 9, 23): '秋分の日',
-    DateTime.utc(2026, 10, 12): 'スポーツの日',
-    DateTime.utc(2026, 11, 3): '文化の日',
-    DateTime.utc(2026, 11, 23): '勤労感謝の日',
-  };
-
   @override
   void initState() {
     super.initState();
@@ -1187,30 +1087,12 @@ class _TimeSettingListPageState extends ConsumerState<_TimeSettingListPage>
     super.dispose();
   }
 
-  DateTime _normalizeDate(DateTime date) {
-    return DateTime.utc(date.year, date.month, date.day);
-  }
-
-  bool _isHoliday(DateTime day) {
-    final normalized = _normalizeDate(day);
-    return _holidays.containsKey(normalized);
-  }
-
   bool _isWeekendOrHoliday(DateTime day) {
-    return day.weekday == DateTime.saturday ||
-        day.weekday == DateTime.sunday ||
-        _isHoliday(day);
+    return ShiftDateUtils.isWeekendOrHoliday(day);
   }
 
   bool _isWeekday(DateTime day) {
-    return !_isWeekendOrHoliday(day);
-  }
-
-  // 日付が第何週かを計算（1-5）
-  int _getWeekOfMonth(DateTime date) {
-    final firstDayOfMonth = DateTime(date.year, date.month, 1);
-    final daysSinceFirstDay = date.difference(firstDayOfMonth).inDays;
-    return (daysSinceFirstDay / 7).floor() + 1;
+    return ShiftDateUtils.isWeekday(day);
   }
 
   // 曜日別選択
@@ -1275,7 +1157,7 @@ class _TimeSettingListPageState extends ConsumerState<_TimeSettingListPage>
     setState(() {
       final shiftDates = ref.read(shiftDateProvider);
       final keys = shiftDates
-          .where((shift) => _getWeekOfMonth(shift.date) == week)
+          .where((shift) => ShiftDateUtils.getWeekOfMonth(shift.date) == week)
           .map((s) => s.uniqueKey)
           .toList();
 
@@ -1326,7 +1208,7 @@ class _TimeSettingListPageState extends ConsumerState<_TimeSettingListPage>
   bool _isWeekOfMonthFullySelected(int week) {
     final shiftDates = ref.read(shiftDateProvider);
     final keys = shiftDates
-        .where((shift) => _getWeekOfMonth(shift.date) == week)
+        .where((shift) => ShiftDateUtils.getWeekOfMonth(shift.date) == week)
         .map((s) => s.uniqueKey)
         .toList();
     if (keys.isEmpty) return false;
@@ -1355,41 +1237,13 @@ class _TimeSettingListPageState extends ConsumerState<_TimeSettingListPage>
     return shiftDates.any((shift) =>
         shift.date.weekday == DateTime.saturday ||
         shift.date.weekday == DateTime.sunday ||
-        _isHoliday(shift.date));
+        JapaneseHolidays.isHoliday(shift.date));
   }
 
   // 該当する週のシフトが存在するかチェック
   bool _hasWeekOfMonth(int week) {
     final shiftDates = ref.read(shiftDateProvider);
-    return shiftDates.any((shift) => _getWeekOfMonth(shift.date) == week);
-  }
-
-  // 勤務時間を計算（時間単位）
-  double? _calculateWorkHours(String? startTime, String? endTime) {
-    if (startTime == null || endTime == null) return null;
-
-    try {
-      final start = TimeOfDay(
-        hour: int.parse(startTime.split(':')[0]),
-        minute: int.parse(startTime.split(':')[1]),
-      );
-      final end = TimeOfDay(
-        hour: int.parse(endTime.split(':')[0]),
-        minute: int.parse(endTime.split(':')[1]),
-      );
-
-      final startMinutes = start.hour * 60 + start.minute;
-      var endMinutes = end.hour * 60 + end.minute;
-
-      // 日をまたぐ場合（終了時刻が開始時刻より前）
-      if (endMinutes <= startMinutes) {
-        endMinutes += 1440; // 24時間を追加
-      }
-
-      return (endMinutes - startMinutes) / 60.0;
-    } catch (e) {
-      return null;
-    }
+    return shiftDates.any((shift) => ShiftDateUtils.getWeekOfMonth(shift.date) == week);
   }
 
   // 統計情報を計算
@@ -1399,7 +1253,7 @@ class _TimeSettingListPageState extends ConsumerState<_TimeSettingListPage>
     int daysWithTime = 0;
 
     for (final shift in shifts) {
-      final hours = _calculateWorkHours(shift.startTime, shift.endTime);
+      final hours = TimeUtils.calculateWorkHours(shift.startTime, shift.endTime);
       if (hours != null) {
         totalHours += hours;
         daysWithTime++;
@@ -2344,34 +2198,6 @@ class _ConfirmationPageState extends ConsumerState<_ConfirmationPage>
     super.dispose();
   }
 
-  // 勤務時間を計算（時間単位）
-  double? _calculateWorkHours(String? startTime, String? endTime) {
-    if (startTime == null || endTime == null) return null;
-
-    try {
-      final start = TimeOfDay(
-        hour: int.parse(startTime.split(':')[0]),
-        minute: int.parse(startTime.split(':')[1]),
-      );
-      final end = TimeOfDay(
-        hour: int.parse(endTime.split(':')[0]),
-        minute: int.parse(endTime.split(':')[1]),
-      );
-
-      final startMinutes = start.hour * 60 + start.minute;
-      var endMinutes = end.hour * 60 + end.minute;
-
-      // 日をまたぐ場合（終了時刻が開始時刻より前）
-      if (endMinutes <= startMinutes) {
-        endMinutes += 1440; // 24時間を追加
-      }
-
-      return (endMinutes - startMinutes) / 60.0;
-    } catch (e) {
-      return null;
-    }
-  }
-
   // 統計情報を計算
   Map<String, dynamic> _calculateStatistics(List<dynamic> shifts) {
     int totalDays = shifts.length;
@@ -2379,7 +2205,7 @@ class _ConfirmationPageState extends ConsumerState<_ConfirmationPage>
     int daysWithTime = 0;
 
     for (final shift in shifts) {
-      final hours = _calculateWorkHours(shift.startTime, shift.endTime);
+      final hours = TimeUtils.calculateWorkHours(shift.startTime, shift.endTime);
       if (hours != null) {
         totalHours += hours;
         daysWithTime++;
