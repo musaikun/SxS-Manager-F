@@ -4,6 +4,8 @@ import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 import '../providers/shift_date_provider.dart';
+import '../utils/time_utils.dart';
+import '../constants/shift_constants.dart';
 
 class TimeSettingScreen extends ConsumerStatefulWidget {
   final String uniqueKey;
@@ -72,7 +74,7 @@ class _TimeSettingScreenState extends ConsumerState<TimeSettingScreen> {
   // カスタムプリセットを読み込み
   Future<void> _loadCustomPresets() async {
     final prefs = await SharedPreferences.getInstance();
-    final presetsJson = prefs.getString('custom_time_presets');
+    final presetsJson = prefs.getString(ShiftConstants.customPresetsStorageKey);
     if (presetsJson != null) {
       final List<dynamic> decoded = jsonDecode(presetsJson);
       setState(() {
@@ -87,7 +89,7 @@ class _TimeSettingScreenState extends ConsumerState<TimeSettingScreen> {
     final prefs = await SharedPreferences.getInstance();
     final presetsJson =
         jsonEncode(_customPresets.map((p) => p.toJson()).toList());
-    await prefs.setString('custom_time_presets', presetsJson);
+    await prefs.setString(ShiftConstants.customPresetsStorageKey, presetsJson);
   }
 
   // カスタムプリセットを追加
@@ -224,16 +226,11 @@ class _TimeSettingScreenState extends ConsumerState<TimeSettingScreen> {
     super.dispose();
   }
 
-  // 時間を文字列に変換
-  String _timeToString(TimeOfDay time) {
-    return '${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}';
-  }
-
   // 保存
   void _save() {
     if (_startTime == null || _endTime == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('開始時刻と終了時刻を設定してください')),
+        const SnackBar(content: Text(ShiftConstants.messageNoTimeSet)),
       );
       return;
     }
@@ -241,8 +238,8 @@ class _TimeSettingScreenState extends ConsumerState<TimeSettingScreen> {
     // Providerに保存（日をまたぐ場合も許可）
     ref.read(shiftDateProvider.notifier).updateTime(
           widget.uniqueKey,
-          _timeToString(_startTime!),
-          _timeToString(_endTime!),
+          TimeUtils.timeToString(_startTime!),
+          TimeUtils.timeToString(_endTime!),
         );
 
     if (_memoController.text.isNotEmpty) {
@@ -254,48 +251,13 @@ class _TimeSettingScreenState extends ConsumerState<TimeSettingScreen> {
 
     Navigator.pop(context);
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('保存しました')),
+      const SnackBar(content: Text(ShiftConstants.messageSaved)),
     );
   }
 
   // 勤務時間を計算（日をまたぐ場合も対応）
   String _calculateWorkingHours() {
-    if (_startTime == null || _endTime == null) {
-      return '--';
-    }
-
-    final startMinutes = _startTime!.hour * 60 + _startTime!.minute;
-    var endMinutes = _endTime!.hour * 60 + _endTime!.minute;
-
-    // 終了時刻が開始時刻より前の場合は翌日とみなす
-    if (endMinutes <= startMinutes) {
-      endMinutes += 1440; // 24時間を追加
-    }
-
-    final diff = endMinutes - startMinutes;
-    final hours = diff ~/ 60;
-    final minutes = diff % 60;
-
-    return '$hours時間${minutes > 0 ? "$minutes分" : ""}';
-  }
-
-  // 分を0, 15, 30, 45の15分刻みに丸める
-  int _roundMinutes(int minutes) {
-    if (minutes < 8) return 0;
-    if (minutes < 23) return 15;
-    if (minutes < 38) return 30;
-    if (minutes < 53) return 45;
-    return 0; // 53以上は次の時間の0分
-  }
-
-  // 時間を分単位に変換（0-1439）
-  int _timeToMinutes(TimeOfDay time) {
-    return time.hour * 60 + time.minute;
-  }
-
-  // 分単位を時間に変換
-  TimeOfDay _minutesToTime(int minutes) {
-    return TimeOfDay(hour: (minutes ~/ 60) % 24, minute: minutes % 60);
+    return TimeUtils.formatWorkingHours(_startTime, _endTime);
   }
 
   // 時間設定ダイアログを表示（スライダー式）
@@ -305,12 +267,12 @@ class _TimeSettingScreenState extends ConsumerState<TimeSettingScreen> {
     TimeOfDay initialEndTime = _endTime ?? const TimeOfDay(hour: 18, minute: 0);
 
     // 分を15分刻みに丸める
-    int startMinutes = initialStartTime.hour * 60 + _roundMinutes(initialStartTime.minute);
-    int endMinutes = initialEndTime.hour * 60 + _roundMinutes(initialEndTime.minute);
+    int startMinutes = initialStartTime.hour * 60 + TimeUtils.roundToQuarterHour(initialStartTime.minute);
+    int endMinutes = initialEndTime.hour * 60 + TimeUtils.roundToQuarterHour(initialEndTime.minute);
 
-    // 終了時刻が開始時刻より前の場合は、翌日とみなす（+1440分）
+    // 終了時刻が開始時刻より前の場合は、翌日とみなす（+TimeUtils.minutesPerDay分）
     if (endMinutes <= startMinutes) {
-      endMinutes += 1440;
+      endMinutes += TimeUtils.minutesPerDay;
     }
 
     double tempStartMinutes = startMinutes.toDouble();
@@ -320,8 +282,8 @@ class _TimeSettingScreenState extends ConsumerState<TimeSettingScreen> {
       context: context,
       builder: (context) => StatefulBuilder(
         builder: (context, setDialogState) {
-          TimeOfDay currentStartTime = _minutesToTime(tempStartMinutes.round());
-          TimeOfDay currentEndTime = _minutesToTime(tempEndMinutes.round() % 1440);
+          TimeOfDay currentStartTime = TimeUtils.minutesToTime(tempStartMinutes.round());
+          TimeOfDay currentEndTime = TimeUtils.minutesToTime(tempEndMinutes.round() % TimeUtils.minutesPerDay);
 
           // 勤務時間を計算
           int workingMinutes = (tempEndMinutes - tempStartMinutes).round();
@@ -329,7 +291,7 @@ class _TimeSettingScreenState extends ConsumerState<TimeSettingScreen> {
           int workingMins = workingMinutes % 60;
 
           // 日をまたぐかどうか
-          bool crossesMidnight = tempEndMinutes >= 1440;
+          bool crossesMidnight = tempEndMinutes >= TimeUtils.minutesPerDay;
 
           return AlertDialog(
             title: const Text('勤務時間設定'),
@@ -560,8 +522,8 @@ class _TimeSettingScreenState extends ConsumerState<TimeSettingScreen> {
                       _buildDialogQuickSetButton(
                         setDialogState,
                         (start, end) {
-                          tempStartMinutes = _timeToMinutes(start).toDouble();
-                          tempEndMinutes = _timeToMinutes(end).toDouble();
+                          tempStartMinutes = TimeUtils.timeToMinutes(start).toDouble();
+                          tempEndMinutes = TimeUtils.timeToMinutes(end).toDouble();
                         },
                         '9:00-18:00',
                         9,
@@ -572,8 +534,8 @@ class _TimeSettingScreenState extends ConsumerState<TimeSettingScreen> {
                       _buildDialogQuickSetButton(
                         setDialogState,
                         (start, end) {
-                          tempStartMinutes = _timeToMinutes(start).toDouble();
-                          tempEndMinutes = _timeToMinutes(end).toDouble();
+                          tempStartMinutes = TimeUtils.timeToMinutes(start).toDouble();
+                          tempEndMinutes = TimeUtils.timeToMinutes(end).toDouble();
                         },
                         '10:00-19:00',
                         10,
@@ -584,8 +546,8 @@ class _TimeSettingScreenState extends ConsumerState<TimeSettingScreen> {
                       _buildDialogQuickSetButton(
                         setDialogState,
                         (start, end) {
-                          tempStartMinutes = _timeToMinutes(start).toDouble();
-                          tempEndMinutes = _timeToMinutes(end).toDouble();
+                          tempStartMinutes = TimeUtils.timeToMinutes(start).toDouble();
+                          tempEndMinutes = TimeUtils.timeToMinutes(end).toDouble();
                         },
                         '13:00-22:00',
                         13,
@@ -596,8 +558,8 @@ class _TimeSettingScreenState extends ConsumerState<TimeSettingScreen> {
                       _buildDialogQuickSetButton(
                         setDialogState,
                         (start, end) {
-                          tempStartMinutes = _timeToMinutes(start).toDouble();
-                          tempEndMinutes = _timeToMinutes(end).toDouble();
+                          tempStartMinutes = TimeUtils.timeToMinutes(start).toDouble();
+                          tempEndMinutes = TimeUtils.timeToMinutes(end).toDouble();
                         },
                         '17:00-23:00',
                         17,
@@ -608,9 +570,9 @@ class _TimeSettingScreenState extends ConsumerState<TimeSettingScreen> {
                       _buildDialogQuickSetButton(
                         setDialogState,
                         (start, end) {
-                          tempStartMinutes = _timeToMinutes(start).toDouble();
+                          tempStartMinutes = TimeUtils.timeToMinutes(start).toDouble();
                           // 深夜帯なので翌日扱い
-                          tempEndMinutes = (_timeToMinutes(end) + 1440).toDouble();
+                          tempEndMinutes = (TimeUtils.timeToMinutes(end) + TimeUtils.minutesPerDay).toDouble();
                         },
                         '22:00-翌7:00',
                         22,
@@ -623,11 +585,11 @@ class _TimeSettingScreenState extends ConsumerState<TimeSettingScreen> {
                         return _buildDialogQuickSetButton(
                           setDialogState,
                           (start, end) {
-                            tempStartMinutes = _timeToMinutes(start).toDouble();
+                            tempStartMinutes = TimeUtils.timeToMinutes(start).toDouble();
                             if (preset.crossesMidnight) {
-                              tempEndMinutes = (_timeToMinutes(end) + 1440).toDouble();
+                              tempEndMinutes = (TimeUtils.timeToMinutes(end) + TimeUtils.minutesPerDay).toDouble();
                             } else {
-                              tempEndMinutes = _timeToMinutes(end).toDouble();
+                              tempEndMinutes = TimeUtils.timeToMinutes(end).toDouble();
                             }
                           },
                           preset.crossesMidnight
@@ -657,8 +619,8 @@ class _TimeSettingScreenState extends ConsumerState<TimeSettingScreen> {
               TextButton(
                 onPressed: () {
                   setState(() {
-                    _startTime = _minutesToTime(tempStartMinutes.round());
-                    _endTime = _minutesToTime(tempEndMinutes.round() % 1440);
+                    _startTime = TimeUtils.minutesToTime(tempStartMinutes.round());
+                    _endTime = TimeUtils.minutesToTime(tempEndMinutes.round() % TimeUtils.minutesPerDay);
                   });
                   Navigator.pop(context);
                 },
