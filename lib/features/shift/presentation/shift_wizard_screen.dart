@@ -1259,7 +1259,31 @@ class _TimeSettingListPageState extends ConsumerState<_TimeSettingListPage>
     return shiftDates.any((shift) => ShiftDateUtils.getWeekOfMonth(shift.date) == week);
   }
 
-  // 時間未設定のシフトをすべて選択
+  // 時間未設定のシフトが存在するかチェック
+  bool _hasUnsetTimes() {
+    final shiftDates = ref.read(shiftDateProvider);
+    return shiftDates.any((shift) => shift.startTime == null || shift.endTime == null);
+  }
+
+  // 全選択状態かチェック
+  bool _isAllSelected() {
+    final shiftDates = ref.read(shiftDateProvider);
+    if (shiftDates.isEmpty) return false;
+    return _selectedUniqueKeys.length == shiftDates.length;
+  }
+
+  // 未設定のシフトが全て選択されているかチェック
+  bool _isUnsetTimesFullySelected() {
+    final shiftDates = ref.read(shiftDateProvider);
+    final unsetKeys = shiftDates
+        .where((shift) => shift.startTime == null || shift.endTime == null)
+        .map((s) => s.uniqueKey)
+        .toSet();
+    if (unsetKeys.isEmpty) return false;
+    return unsetKeys.every((k) => _selectedUniqueKeys.contains(k));
+  }
+
+  // 時間未設定のシフトをトグル選択
   void _selectUnsetTimes() {
     setState(() {
       final shiftDates = ref.read(shiftDateProvider);
@@ -1268,8 +1292,12 @@ class _TimeSettingListPageState extends ConsumerState<_TimeSettingListPage>
           .map((s) => s.uniqueKey)
           .toList();
 
-      _selectedUniqueKeys.clear();
-      _selectedUniqueKeys.addAll(unsetKeys);
+      // トグル動作
+      if (_isUnsetTimesFullySelected()) {
+        _selectedUniqueKeys.removeAll(unsetKeys);
+      } else {
+        _selectedUniqueKeys.addAll(unsetKeys);
+      }
     });
   }
 
@@ -1777,34 +1805,46 @@ class _TimeSettingListPageState extends ConsumerState<_TimeSettingListPage>
                       children: [
                         Expanded(
                           child: OutlinedButton.icon(
-                            onPressed: () {
-                              setState(() {
-                                if (_selectedUniqueKeys.length ==
-                                    shiftDates.length) {
-                                  _selectedUniqueKeys.clear();
-                                } else {
-                                  _selectedUniqueKeys.clear();
-                                  _selectedUniqueKeys.addAll(
-                                      shiftDates.map((s) => s.uniqueKey));
-                                }
-                              });
-                            },
-                            icon: Icon(_selectedUniqueKeys.length ==
-                                    shiftDates.length
-                                ? Icons.check_box
-                                : Icons.check_box_outline_blank),
+                            onPressed: shiftDates.isEmpty
+                                ? null
+                                : () {
+                                    setState(() {
+                                      if (_isAllSelected()) {
+                                        _selectedUniqueKeys.clear();
+                                      } else {
+                                        _selectedUniqueKeys.clear();
+                                        _selectedUniqueKeys.addAll(
+                                            shiftDates.map((s) => s.uniqueKey));
+                                      }
+                                    });
+                                  },
+                            icon: const Icon(Icons.select_all, size: 16),
                             label: const Text('全選択', style: TextStyle(fontSize: 11)),
+                            style: OutlinedButton.styleFrom(
+                              backgroundColor: _isAllSelected() ? Colors.green : null,
+                              foregroundColor: _isAllSelected() ? Colors.white : null,
+                              side: BorderSide(
+                                color: shiftDates.isEmpty
+                                    ? Colors.grey.shade300
+                                    : (_isAllSelected() ? Colors.green : Colors.grey),
+                              ),
+                            ),
                           ),
                         ),
                         const SizedBox(width: 4),
                         Expanded(
                           child: OutlinedButton.icon(
-                            onPressed: _selectUnsetTimes,
+                            onPressed: _hasUnsetTimes() ? _selectUnsetTimes : null,
                             icon: const Icon(Icons.schedule, size: 16),
                             label: const Text('未設定', style: TextStyle(fontSize: 11)),
                             style: OutlinedButton.styleFrom(
-                              foregroundColor: Colors.orange,
-                              side: const BorderSide(color: Colors.orange),
+                              backgroundColor: _isUnsetTimesFullySelected() ? Colors.orange : null,
+                              foregroundColor: _isUnsetTimesFullySelected() ? Colors.white : Colors.orange,
+                              side: BorderSide(
+                                color: !_hasUnsetTimes()
+                                    ? Colors.grey.shade300
+                                    : (_isUnsetTimesFullySelected() ? Colors.orange : Colors.orange),
+                              ),
                             ),
                           ),
                         ),
