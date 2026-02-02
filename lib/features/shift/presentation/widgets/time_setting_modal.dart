@@ -16,6 +16,87 @@ class TimeSettingResult {
   });
 }
 
+/// プリセット追加ダイアログ
+class _AddPresetDialog extends StatefulWidget {
+  final String defaultLabel;
+  final TimeOfDay currentStartTime;
+  final TimeOfDay currentEndTime;
+  final bool crossesMidnight;
+  final Function(TimePreset) onAdd;
+
+  const _AddPresetDialog({
+    required this.defaultLabel,
+    required this.currentStartTime,
+    required this.currentEndTime,
+    required this.crossesMidnight,
+    required this.onAdd,
+  });
+
+  @override
+  State<_AddPresetDialog> createState() => _AddPresetDialogState();
+}
+
+class _AddPresetDialogState extends State<_AddPresetDialog> {
+  late TextEditingController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController(text: widget.defaultLabel);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('クイック設定に追加'),
+      content: TextField(
+        controller: _controller,
+        decoration: const InputDecoration(
+          labelText: '名前',
+          hintText: '例: 9:00-18:00',
+        ),
+        autofocus: true,
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('キャンセル'),
+        ),
+        TextButton(
+          onPressed: () {
+            final label = _controller.text.trim();
+            if (label.isEmpty) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('名前を入力してください')),
+              );
+              return;
+            }
+
+            final preset = TimePreset(
+              label: label,
+              startHour: widget.currentStartTime.hour,
+              startMinute: widget.currentStartTime.minute,
+              endHour: widget.currentEndTime.hour,
+              endMinute: widget.currentEndTime.minute,
+              isNextDay: widget.crossesMidnight,
+            );
+
+            widget.onAdd(preset);
+            Navigator.pop(context);
+          },
+          child: const Text('追加'),
+        ),
+      ],
+    );
+  }
+}
+
 /// 時間設定モーダル（個別・一括共通）
 class TimeSettingModal extends ConsumerStatefulWidget {
   final String title; // モーダルのタイトル（例: "時間設定" or "一括時間設定（3件）"）
@@ -87,66 +168,30 @@ class _TimeSettingModalState extends ConsumerState<TimeSettingModal> {
   }
 
   // プリセット追加ダイアログを表示
-  void _showAddPresetDialog() async {
+  void _showAddPresetDialog() {
     final currentStartTime = _minutesToTime(tempStartMinutes.round());
     final currentEndTime = _minutesToTime(tempEndMinutes.round() % 1440);
     final bool crossesMidnight = tempEndMinutes >= 1440;
 
-    final TextEditingController labelController = TextEditingController(
-      text: crossesMidnight
-          ? '${currentStartTime.hour}:${currentStartTime.minute.toString().padLeft(2, '0')}-翌${currentEndTime.hour}:${currentEndTime.minute.toString().padLeft(2, '0')}'
-          : '${currentStartTime.hour}:${currentStartTime.minute.toString().padLeft(2, '0')}-${currentEndTime.hour}:${currentEndTime.minute.toString().padLeft(2, '0')}',
-    );
+    final String defaultLabel = crossesMidnight
+        ? '${currentStartTime.hour}:${currentStartTime.minute.toString().padLeft(2, '0')}-翌${currentEndTime.hour}:${currentEndTime.minute.toString().padLeft(2, '0')}'
+        : '${currentStartTime.hour}:${currentStartTime.minute.toString().padLeft(2, '0')}-${currentEndTime.hour}:${currentEndTime.minute.toString().padLeft(2, '0')}';
 
-    await showDialog(
+    showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('クイック設定に追加'),
-        content: TextField(
-          controller: labelController,
-          decoration: const InputDecoration(
-            labelText: '名前',
-            hintText: '例: 9:00-18:00',
-          ),
-          autofocus: true,
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('キャンセル'),
-          ),
-          TextButton(
-            onPressed: () {
-              final label = labelController.text.trim();
-              if (label.isEmpty) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('名前を入力してください')),
-                );
-                return;
-              }
-
-              final preset = TimePreset(
-                label: label,
-                startHour: currentStartTime.hour,
-                startMinute: currentStartTime.minute,
-                endHour: currentEndTime.hour,
-                endMinute: currentEndTime.minute,
-                isNextDay: crossesMidnight,
-              );
-
-              ref.read(timePresetProvider.notifier).addPreset(preset);
-              Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text('「$label」を追加しました')),
-              );
-            },
-            child: const Text('追加'),
-          ),
-        ],
+      builder: (context) => _AddPresetDialog(
+        defaultLabel: defaultLabel,
+        currentStartTime: currentStartTime,
+        currentEndTime: currentEndTime,
+        crossesMidnight: crossesMidnight,
+        onAdd: (preset) {
+          ref.read(timePresetProvider.notifier).addPreset(preset);
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('「${preset.label}」を追加しました')),
+          );
+        },
       ),
     );
-
-    labelController.dispose();
   }
 
   @override

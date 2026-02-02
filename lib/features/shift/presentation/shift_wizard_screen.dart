@@ -1392,23 +1392,7 @@ class _TimeSettingListPageState extends ConsumerState<_TimeSettingListPage>
           ],
         ),
         backgroundColor: Theme.of(context).colorScheme.inversePrimary,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: widget.onPrevious,
-        ),
-        actions: [
-          TextButton(
-            onPressed: widget.onNext,
-            child: const Text(
-              '次へ',
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ),
-        ],
+        automaticallyImplyLeading: false,
       ),
       body: shiftDates.isEmpty
           ? Center(
@@ -2101,10 +2085,7 @@ class _ConfirmationPageState extends ConsumerState<_ConfirmationPage>
       appBar: AppBar(
         title: const Text('確認・提出'),
         backgroundColor: Theme.of(context).colorScheme.inversePrimary,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: widget.onPrevious,
-        ),
+        automaticallyImplyLeading: false,
       ),
       body: shiftDates.isEmpty
           ? Center(
