@@ -1098,12 +1098,15 @@ class _TimeSettingListPageState extends ConsumerState<_TimeSettingListPage>
 
     // アコーディオンアニメーションの初期化
     _accordionController = AnimationController(
-      duration: const Duration(milliseconds: 300),
+      duration: const Duration(milliseconds: 500),
       vsync: this,
     );
 
     _accordionRotation = Tween<double>(begin: 0.0, end: 0.5).animate(
-      CurvedAnimation(parent: _accordionController, curve: Curves.easeInOut),
+      CurvedAnimation(
+        parent: _accordionController,
+        curve: Curves.easeInOutCubic,
+      ),
     );
   }
 
@@ -1557,10 +1560,11 @@ class _TimeSettingListPageState extends ConsumerState<_TimeSettingListPage>
 
                       // アコーディオンコンテンツ
                       AnimatedSize(
-                        duration: const Duration(milliseconds: 300),
-                        curve: Curves.easeInOut,
+                        duration: const Duration(milliseconds: 500),
+                        curve: Curves.easeInOutCubic,
                         child: _isBatchSelectionExpanded
                             ? Column(
+                                mainAxisSize: MainAxisSize.min,
                                 children: [
                   // 全選択、未設定選択、クリア、時間設定ボタン
                   Padding(
