@@ -732,11 +732,14 @@ class _TimeSettingScreenState extends ConsumerState<TimeSettingScreen> {
           ),
         ],
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
+      body: Column(
+        children: [
+          Expanded(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
             // 日付表示
             Card(
               child: Padding(
@@ -952,23 +955,42 @@ class _TimeSettingScreenState extends ConsumerState<TimeSettingScreen> {
               maxLength: 100,
             ),
 
-            const SizedBox(height: 24),
+                ],
+              ),
+            ),
+          ),
 
-            // 保存ボタン
-            ElevatedButton.icon(
-              onPressed: _save,
-              icon: const Icon(Icons.save),
-              label: const Text('保存'),
-              style: ElevatedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(vertical: 16),
-                textStyle: const TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
+          // 保存ボタン（統一デザインフッター）
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              border: const Border(top: BorderSide(color: Colors.grey, width: 1)),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.grey.withValues(alpha: 0.15),
+                  blurRadius: 8,
+                  offset: const Offset(0, -2),
+                ),
+              ],
+            ),
+            child: SafeArea(
+              child: ElevatedButton.icon(
+                onPressed: _save,
+                icon: const Icon(Icons.save, size: 24),
+                label: const Text('保存'),
+                style: ElevatedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  minimumSize: const Size.fromHeight(50),
+                  textStyle: const TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
               ),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }

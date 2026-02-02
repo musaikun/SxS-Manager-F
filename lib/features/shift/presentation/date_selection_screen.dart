@@ -501,43 +501,47 @@ class _DateSelectionScreenState extends ConsumerState<DateSelectionScreen> {
 
           const Divider(height: 1),
 
-          // 選択数表示
+          // 選択数表示（統一デザイン）
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [
-                  Theme.of(context).colorScheme.primaryContainer,
-                  Theme.of(context).colorScheme.primaryContainer.withValues(alpha:0.7),
-                ],
-              ),
+              color: Colors.white,
               border: const Border(top: BorderSide(color: Colors.grey, width: 1)),
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(6),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    shape: BoxShape.circle,
-                  ),
-                  child: Icon(
-                    Icons.check_circle,
-                    size: 20,
-                    color: Theme.of(context).colorScheme.primary,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Text(
-                  '選択: ${_tempSelectedDates.length}日',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: Theme.of(context).colorScheme.onPrimaryContainer,
-                  ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.grey.withValues(alpha: 0.15),
+                  blurRadius: 8,
+                  offset: const Offset(0, -2),
                 ),
               ],
+            ),
+            child: SafeArea(
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).colorScheme.primaryContainer,
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      Icons.check_circle,
+                      size: 24,
+                      color: Theme.of(context).colorScheme.primary,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Text(
+                    '選択: ${_tempSelectedDates.length}日',
+                    style: const TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.black87,
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ],

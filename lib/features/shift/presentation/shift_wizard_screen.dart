@@ -2456,93 +2456,101 @@ class _ConfirmationPageState extends ConsumerState<_ConfirmationPage> {
                   ),
                 ),
 
-                // 統計情報表示（下部固定）
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [
-                        Colors.green.shade100,
-                        Colors.green.shade50,
-                      ],
-                    ),
-                    border: const Border(
-                      top: BorderSide(color: Colors.grey, width: 1),
-                    ),
-                  ),
-                  child: Column(
-                    children: [
-                      const Text(
-                        'シフト統計',
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceAround,
-                        children: [
-                          _buildStatItem(
-                            Icons.calendar_today,
-                            '合計勤務日数',
-                            '${stats['totalDays']}日',
-                          ),
-                          _buildStatItem(
-                            Icons.access_time,
-                            '実労働時間',
-                            '${stats['totalActualHours'].toStringAsFixed(1)}時間',
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 6),
-                      Text(
-                        '※休憩時間を差し引いています（労働基準法に基づく）',
-                        style: TextStyle(
-                          fontSize: 10,
-                          color: Colors.grey[700],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-
-                // 提出ボタン
+                // 統一デザインフッター（統計情報 + 提出ボタン）
                 Container(
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
                     color: Colors.white,
+                    border: const Border(top: BorderSide(color: Colors.grey, width: 1)),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.grey.withValues(alpha:0.2),
-                        blurRadius: 4,
+                        color: Colors.grey.withValues(alpha: 0.15),
+                        blurRadius: 8,
                         offset: const Offset(0, -2),
                       ),
                     ],
                   ),
                   child: SafeArea(
-                    child: ElevatedButton(
-                      onPressed: () {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('シフトを提出しました（※機能は未実装）'),
-                            duration: Duration(seconds: 2),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        // 統計情報
+                        Container(
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: Colors.green.shade50,
+                            borderRadius: BorderRadius.circular(12),
                           ),
-                        );
-                      },
-                      style: ElevatedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        backgroundColor: Colors.green,
-                        minimumSize: const Size.fromHeight(50),
-                      ),
-                      child: const Text(
-                        '提出する',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
+                          child: Column(
+                            children: [
+                              const Text(
+                                'シフト統計',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.black87,
+                                ),
+                              ),
+                              const SizedBox(height: 12),
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceAround,
+                                children: [
+                                  _buildStatItem(
+                                    Icons.calendar_today,
+                                    '合計勤務日数',
+                                    '${stats['totalDays']}日',
+                                  ),
+                                  Container(
+                                    width: 1,
+                                    height: 40,
+                                    color: Colors.grey.shade300,
+                                  ),
+                                  _buildStatItem(
+                                    Icons.access_time,
+                                    '実労働時間',
+                                    '${stats['totalActualHours'].toStringAsFixed(1)}時間',
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                '※休憩時間を差し引いています（労働基準法に基づく）',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: Colors.grey[700],
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
-                      ),
+
+                        const SizedBox(height: 16),
+
+                        // 提出ボタン
+                        ElevatedButton.icon(
+                          onPressed: () {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('シフトを提出しました（※機能は未実装）'),
+                                duration: Duration(seconds: 2),
+                              ),
+                            );
+                          },
+                          icon: const Icon(Icons.send, size: 24),
+                          label: const Text('提出する'),
+                          style: ElevatedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: 16),
+                            backgroundColor: Colors.green,
+                            foregroundColor: Colors.white,
+                            minimumSize: const Size.fromHeight(50),
+                            textStyle: const TextStyle(
+                              fontSize: 20,
+                              fontWeight: FontWeight.bold,
+                            ),
+                            elevation: 2,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ),
@@ -2552,31 +2560,31 @@ class _ConfirmationPageState extends ConsumerState<_ConfirmationPage> {
   }
 
   Widget _buildStatItem(IconData icon, String label, String value) {
-    return Column(
-      children: [
-        Row(
-          children: [
-            Icon(icon, size: 20, color: Colors.green.shade700),
-            const SizedBox(width: 4),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 12,
-                color: Colors.grey[700],
-              ),
+    return Expanded(
+      child: Column(
+        children: [
+          Icon(icon, size: 28, color: Colors.green.shade700),
+          const SizedBox(height: 8),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 13,
+              color: Colors.grey[700],
+              fontWeight: FontWeight.w500,
             ),
-          ],
-        ),
-        const SizedBox(height: 4),
-        Text(
-          value,
-          style: const TextStyle(
-            fontSize: 20,
-            fontWeight: FontWeight.bold,
-            color: Colors.black87,
+            textAlign: TextAlign.center,
           ),
-        ),
-      ],
+          const SizedBox(height: 4),
+          Text(
+            value,
+            style: const TextStyle(
+              fontSize: 22,
+              fontWeight: FontWeight.bold,
+              color: Colors.black87,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
