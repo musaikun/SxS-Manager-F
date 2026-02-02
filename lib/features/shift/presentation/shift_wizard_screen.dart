@@ -477,6 +477,21 @@ class _DateSelectionPageState extends ConsumerState<_DateSelectionPage> {
 
   void _clearSelection() {
     setState(() {
+      final defaultStore = ref.read(defaultStoreProvider);
+      final currentShifts = ref.read(shiftDateProvider);
+
+      // 選択された日付に対応するシフトデータを削除
+      for (final date in widget.tempSelectedDates.toList()) {
+        try {
+          final targetShift = currentShifts.firstWhere(
+            (s) => ShiftDateUtils.normalizeDate(s.date) == date && s.storeId == defaultStore.id,
+          );
+          ref.read(shiftDateProvider.notifier).removeDate(targetShift.uniqueKey);
+        } catch (e) {
+          // シフトが見つからない場合は何もしない
+        }
+      }
+
       widget.tempSelectedDates.clear();
     });
   }
@@ -489,24 +504,23 @@ class _DateSelectionPageState extends ConsumerState<_DateSelectionPage> {
     double totalHours = 0.0;
 
     for (final date in widget.tempSelectedDates) {
-      final shift = currentShifts.firstWhere(
-        (s) => ShiftDateUtils.normalizeDate(s.date) == date && s.storeId == defaultStore.id,
-        orElse: () => currentShifts.first, // ダミー
-      );
-
-      // 該当するシフトが見つかり、時間が設定されている場合
-      final hasShift = currentShifts.any(
-        (s) => ShiftDateUtils.normalizeDate(s.date) == date && s.storeId == defaultStore.id,
-      );
-
-      if (hasShift && shift.startTime != null && shift.endTime != null) {
-        final hours = TimeUtils.calculateWorkHours(
-          shift.startTime!,
-          shift.endTime!,
+      // 該当するシフトを安全に検索
+      try {
+        final shift = currentShifts.firstWhere(
+          (s) => ShiftDateUtils.normalizeDate(s.date) == date && s.storeId == defaultStore.id,
         );
-        if (hours != null) {
-          totalHours += hours;
+
+        if (shift.startTime != null && shift.endTime != null) {
+          final hours = TimeUtils.calculateWorkHours(
+            shift.startTime!,
+            shift.endTime!,
+          );
+          if (hours != null) {
+            totalHours += hours;
+          }
         }
+      } catch (e) {
+        // シフトが見つからない場合はスキップ
       }
     }
 
