@@ -16,87 +16,6 @@ class TimeSettingResult {
   });
 }
 
-/// プリセット追加ダイアログ
-class _AddPresetDialog extends StatefulWidget {
-  final String defaultLabel;
-  final TimeOfDay currentStartTime;
-  final TimeOfDay currentEndTime;
-  final bool crossesMidnight;
-  final Function(TimePreset) onAdd;
-
-  const _AddPresetDialog({
-    required this.defaultLabel,
-    required this.currentStartTime,
-    required this.currentEndTime,
-    required this.crossesMidnight,
-    required this.onAdd,
-  });
-
-  @override
-  State<_AddPresetDialog> createState() => _AddPresetDialogState();
-}
-
-class _AddPresetDialogState extends State<_AddPresetDialog> {
-  late TextEditingController _controller;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = TextEditingController(text: widget.defaultLabel);
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return AlertDialog(
-      title: const Text('クイック設定に追加'),
-      content: TextField(
-        controller: _controller,
-        decoration: const InputDecoration(
-          labelText: '名前',
-          hintText: '例: 9:00-18:00',
-        ),
-        autofocus: true,
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: const Text('キャンセル'),
-        ),
-        TextButton(
-          onPressed: () {
-            final label = _controller.text.trim();
-            if (label.isEmpty) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('名前を入力してください')),
-              );
-              return;
-            }
-
-            final preset = TimePreset(
-              label: label,
-              startHour: widget.currentStartTime.hour,
-              startMinute: widget.currentStartTime.minute,
-              endHour: widget.currentEndTime.hour,
-              endMinute: widget.currentEndTime.minute,
-              isNextDay: widget.crossesMidnight,
-            );
-
-            widget.onAdd(preset);
-            Navigator.pop(context);
-          },
-          child: const Text('追加'),
-        ),
-      ],
-    );
-  }
-}
-
 /// 時間設定モーダル（個別・一括共通）
 class TimeSettingModal extends ConsumerStatefulWidget {
   final String title; // モーダルのタイトル（例: "時間設定" or "一括時間設定（3件）"）
@@ -167,30 +86,28 @@ class _TimeSettingModalState extends ConsumerState<TimeSettingModal> {
     return TimeOfDay(hour: (minutes ~/ 60) % 24, minute: minutes % 60);
   }
 
-  // プリセット追加ダイアログを表示
-  void _showAddPresetDialog() {
+  // プリセット追加（名前入力なし、自動生成）
+  void _addCurrentTimeAsPreset() {
     final currentStartTime = _minutesToTime(tempStartMinutes.round());
     final currentEndTime = _minutesToTime(tempEndMinutes.round() % 1440);
     final bool crossesMidnight = tempEndMinutes >= 1440;
 
-    final String defaultLabel = crossesMidnight
+    final String label = crossesMidnight
         ? '${currentStartTime.hour}:${currentStartTime.minute.toString().padLeft(2, '0')}-翌${currentEndTime.hour}:${currentEndTime.minute.toString().padLeft(2, '0')}'
         : '${currentStartTime.hour}:${currentStartTime.minute.toString().padLeft(2, '0')}-${currentEndTime.hour}:${currentEndTime.minute.toString().padLeft(2, '0')}';
 
-    showDialog(
-      context: context,
-      builder: (context) => _AddPresetDialog(
-        defaultLabel: defaultLabel,
-        currentStartTime: currentStartTime,
-        currentEndTime: currentEndTime,
-        crossesMidnight: crossesMidnight,
-        onAdd: (preset) {
-          ref.read(timePresetProvider.notifier).addPreset(preset);
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('「${preset.label}」を追加しました')),
-          );
-        },
-      ),
+    final preset = TimePreset(
+      label: label,
+      startHour: currentStartTime.hour,
+      startMinute: currentStartTime.minute,
+      endHour: currentEndTime.hour,
+      endMinute: currentEndTime.minute,
+      isNextDay: crossesMidnight,
+    );
+
+    ref.read(timePresetProvider.notifier).addPreset(preset);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('「$label」をクイック設定に追加しました')),
     );
   }
 
@@ -444,16 +361,16 @@ class _TimeSettingModalState extends ConsumerState<TimeSettingModal> {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 const Text(
-                  'クイック設定',
+                  'クイック設定（タップで時間を設定）',
                   style: TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
                 TextButton.icon(
-                  onPressed: _showAddPresetDialog,
+                  onPressed: _addCurrentTimeAsPreset,
                   icon: const Icon(Icons.add, size: 18),
-                  label: const Text('追加', style: TextStyle(fontSize: 12)),
+                  label: const Text('現在の時間を追加', style: TextStyle(fontSize: 12)),
                 ),
               ],
             ),
@@ -462,43 +379,50 @@ class _TimeSettingModalState extends ConsumerState<TimeSettingModal> {
               spacing: 8,
               runSpacing: 8,
               children: presets.map((preset) {
-                return OutlinedButton(
-                  onPressed: () {
-                    setState(() {
-                      tempStartMinutes = preset.startMinutes.toDouble();
-                      tempEndMinutes = preset.endMinutes.toDouble();
-                    });
-                  },
-                  onLongPress: () {
-                    // 長押しで削除
-                    showDialog(
-                      context: context,
-                      builder: (context) => AlertDialog(
-                        title: const Text('削除確認'),
-                        content: Text('「${preset.label}」を削除しますか？'),
-                        actions: [
-                          TextButton(
-                            onPressed: () => Navigator.pop(context),
-                            child: const Text('キャンセル'),
-                          ),
-                          TextButton(
-                            onPressed: () {
-                              ref
-                                  .read(timePresetProvider.notifier)
-                                  .removePreset(preset.label);
-                              Navigator.pop(context);
-                            },
-                            child: const Text('削除'),
-                          ),
-                        ],
+                return Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    OutlinedButton(
+                      onPressed: () {
+                        setState(() {
+                          tempStartMinutes = preset.startMinutes.toDouble();
+                          tempEndMinutes = preset.endMinutes.toDouble();
+                        });
+                      },
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 8),
                       ),
-                    );
-                  },
-                  style: OutlinedButton.styleFrom(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                  ),
-                  child: Text(preset.label, style: const TextStyle(fontSize: 12)),
+                      child: Text(preset.label,
+                          style: const TextStyle(fontSize: 12)),
+                    ),
+                    Positioned(
+                      right: -8,
+                      top: -8,
+                      child: GestureDetector(
+                        onTap: () {
+                          ref
+                              .read(timePresetProvider.notifier)
+                              .removePreset(preset.label);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text('「${preset.label}」を削除しました')),
+                          );
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.all(2),
+                          decoration: const BoxDecoration(
+                            color: Colors.red,
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(
+                            Icons.close,
+                            size: 14,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
                 );
               }).toList(),
             ),
