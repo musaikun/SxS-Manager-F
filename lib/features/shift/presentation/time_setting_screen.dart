@@ -713,7 +713,6 @@ class _TimeSettingScreenState extends ConsumerState<TimeSettingScreen> {
     // uniqueKeyから日付を抽出（形式: "2025-01-15_storeId"）
     final dateString = widget.uniqueKey.split('_')[0];
     final date = DateTime.parse(dateString);
-    final weekday = DateFormat.E('ja_JP').format(date);
 
     return Scaffold(
       appBar: AppBar(

@@ -76,11 +76,6 @@ class _TimeSettingModalState extends ConsumerState<TimeSettingModal> {
     super.dispose();
   }
 
-  // 時間を分単位に変換（0-1439）
-  int _timeToMinutes(TimeOfDay time) {
-    return time.hour * 60 + time.minute;
-  }
-
   // 分単位を時間に変換
   TimeOfDay _minutesToTime(int minutes) {
     return TimeOfDay(hour: (minutes ~/ 60) % 24, minute: minutes % 60);

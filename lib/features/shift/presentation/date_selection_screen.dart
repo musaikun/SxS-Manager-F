@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:table_calendar/table_calendar.dart';
-import 'package:intl/intl.dart';
 import '../providers/shift_date_provider.dart';
 import '../providers/store_provider.dart';
 import '../domain/models/store.dart';
@@ -225,7 +224,6 @@ class _DateSelectionScreenState extends ConsumerState<DateSelectionScreen> {
   @override
   Widget build(BuildContext context) {
     final stores = ref.watch(storeProvider);
-    final shiftDates = ref.watch(shiftDateProvider);
 
     return Scaffold(
       appBar: AppBar(
@@ -308,7 +306,7 @@ class _DateSelectionScreenState extends ConsumerState<DateSelectionScreen> {
               calendarStyle: CalendarStyle(
                 // 今日
                 todayDecoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.primary.withOpacity(0.3),
+                  color: Theme.of(context).colorScheme.primary.withValues(alpha:0.3),
                   shape: BoxShape.circle,
                 ),
                 // 選択された日（四角形に変更）
@@ -402,7 +400,7 @@ class _DateSelectionScreenState extends ConsumerState<DateSelectionScreen> {
                                     color: dotColor,
                                     shape: BoxShape.circle,
                                     border: Border.all(
-                                      color: Colors.white.withOpacity(0.5),
+                                      color: Colors.white.withValues(alpha:0.5),
                                       width: 0.5,
                                     ),
                                   ),
@@ -510,7 +508,7 @@ class _DateSelectionScreenState extends ConsumerState<DateSelectionScreen> {
               gradient: LinearGradient(
                 colors: [
                   Theme.of(context).colorScheme.primaryContainer,
-                  Theme.of(context).colorScheme.primaryContainer.withOpacity(0.7),
+                  Theme.of(context).colorScheme.primaryContainer.withValues(alpha:0.7),
                 ],
               ),
               border: const Border(top: BorderSide(color: Colors.grey, width: 1)),
@@ -555,7 +553,7 @@ class _DateSelectionScreenState extends ConsumerState<DateSelectionScreen> {
         color: Colors.white,
         boxShadow: [
           BoxShadow(
-            color: Colors.grey.withOpacity(0.1),
+            color: Colors.grey.withValues(alpha:0.1),
             spreadRadius: 1,
             blurRadius: 3,
             offset: const Offset(0, 2),
@@ -597,9 +595,9 @@ class _DateSelectionScreenState extends ConsumerState<DateSelectionScreen> {
                     }
                   },
                   selectedColor: store.color,
-                  backgroundColor: store.color.withOpacity(0.15),
+                  backgroundColor: store.color.withValues(alpha:0.15),
                   side: BorderSide(
-                    color: isSelected ? store.color : store.color.withOpacity(0.3),
+                    color: isSelected ? store.color : store.color.withValues(alpha:0.3),
                     width: 2,
                   ),
                   labelStyle: TextStyle(

@@ -8,8 +8,6 @@ import '../domain/models/store.dart';
 import '../domain/models/time_preset.dart';
 import '../utils/date_utils.dart';
 import '../utils/time_utils.dart';
-import '../constants/shift_constants.dart';
-import 'time_setting_screen.dart';
 import 'widgets/time_setting_modal.dart';
 
 /// シフト登録ウィザード（3ページ構成）
@@ -155,7 +153,7 @@ class _ShiftWizardScreenState extends ConsumerState<ShiftWizardScreen> {
         color: Colors.white,
         boxShadow: [
           BoxShadow(
-            color: Colors.grey.withOpacity(0.2),
+            color: Colors.grey.withValues(alpha:0.2),
             blurRadius: 4,
             offset: const Offset(0, 2),
           ),
@@ -200,7 +198,7 @@ class _ShiftWizardScreenState extends ConsumerState<ShiftWizardScreen> {
                           color: Theme.of(context)
                               .colorScheme
                               .primary
-                              .withOpacity(0.8),
+                              .withValues(alpha:0.8),
                           blurRadius: 8,
                           spreadRadius: 3,
                         ),
@@ -734,7 +732,7 @@ class _DateSelectionPageState extends ConsumerState<_DateSelectionPage> {
                   borderRadius: BorderRadius.circular(8),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.green.withOpacity(0.4),
+                      color: Colors.green.withValues(alpha:0.4),
                       blurRadius: 8,
                       spreadRadius: 2,
                     ),
@@ -788,7 +786,7 @@ class _DateSelectionPageState extends ConsumerState<_DateSelectionPage> {
                         borderRadius: BorderRadius.circular(8),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.green.withOpacity(0.4),
+                            color: Colors.green.withValues(alpha:0.4),
                             blurRadius: 8,
                             spreadRadius: 2,
                           ),
@@ -1195,10 +1193,10 @@ class _DateSelectionPageState extends ConsumerState<_DateSelectionPage> {
                     ),
                   );
 
-                  if (result != null && result.startTime != null && result.endTime != null) {
+                  if (result != null) {
                     // 時間をパース
-                    final startParts = result.startTime!.split(':');
-                    final endParts = result.endTime!.split(':');
+                    final startParts = result.startTime.split(':');
+                    final endParts = result.endTime.split(':');
                     final startHour = int.parse(startParts[0]);
                     final startMinute = int.parse(startParts[1]);
                     final endHour = int.parse(endParts[0]);
@@ -2023,10 +2021,6 @@ class _TimeSettingListPageState extends ConsumerState<_TimeSettingListPage>
                     itemCount: shiftDates.length,
                     itemBuilder: (context, index) {
                       final shift = shiftDates[index];
-                      final store = stores.firstWhere(
-                        (s) => s.id == shift.storeId,
-                        orElse: () => stores.first,
-                      );
                       final isSelected =
                           _selectedUniqueKeys.contains(shift.uniqueKey);
 
@@ -2534,7 +2528,7 @@ class _ConfirmationPageState extends ConsumerState<_ConfirmationPage>
                     color: Colors.white,
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.grey.withOpacity(0.2),
+                        color: Colors.grey.withValues(alpha:0.2),
                         blurRadius: 4,
                         offset: const Offset(0, -2),
                       ),
@@ -2665,11 +2659,6 @@ class _MonthAccordionState extends State<_MonthAccordion>
           ),
           if (_isExpanded)
             ...widget.shifts.map((shift) {
-              final store = widget.stores.firstWhere(
-                (s) => s.id == shift.storeId,
-                orElse: () => widget.stores.first,
-              );
-
               return ListTile(
                 dense: true,
                 leading: const CircleAvatar(
