@@ -228,6 +228,7 @@ class _DateSelectionScreenState extends ConsumerState<DateSelectionScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('シフト日付選択'),
+        centerTitle: true,
         backgroundColor: Theme.of(context).colorScheme.inversePrimary,
         automaticallyImplyLeading: false,
         actions: [
@@ -292,15 +293,8 @@ class _DateSelectionScreenState extends ConsumerState<DateSelectionScreen> {
                 });
               },
 
-              // ページ変更時の処理（月が変わったとき）
-              onPageChanged: (focusedDay) {
-                setState(() {
-                  _focusedDay = focusedDay;
-                });
-              },
-
-              // 横スワイプのみ有効化（縦スクロールでの月変更を無効化）
-              availableGestures: AvailableGestures.horizontalSwipe,
+              // スワイプでの月移動を完全に無効化（矢印ボタンのみで操作）
+              availableGestures: AvailableGestures.none,
 
               // カスタムヘッダー（矢印ボタン付き）
               headerVisible: true,
@@ -823,52 +817,88 @@ class _DateSelectionScreenState extends ConsumerState<DateSelectionScreen> {
     final isPastMonth = displayMonth.isBefore(currentMonth);
 
     return Container(
-      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+      padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        border: Border(
+          bottom: BorderSide(color: Colors.grey.shade300, width: 1),
+        ),
+      ),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           // 前月ボタン
-          IconButton(
-            icon: const Icon(Icons.chevron_left, size: 32),
-            onPressed: isPastMonth
-                ? null  // 過去の月の場合は無効化
-                : () {
-                    final previousMonth = DateTime(
-                      focusedDay.year,
-                      focusedDay.month - 1,
-                    );
-                    // 過去の月には移動できない
-                    if (!DateTime(previousMonth.year, previousMonth.month)
-                        .isBefore(currentMonth)) {
-                      setState(() {
-                        _focusedDay = previousMonth;
-                      });
-                    }
-                  },
-            color: isPastMonth ? Colors.grey[300] : Colors.black,
+          Container(
+            decoration: BoxDecoration(
+              color: isPastMonth ? Colors.grey.shade100 : Colors.blue.shade50,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(
+                color: isPastMonth ? Colors.grey.shade300 : Colors.blue.shade200,
+                width: 1,
+              ),
+            ),
+            child: IconButton(
+              icon: Icon(
+                Icons.chevron_left,
+                size: 28,
+                color: isPastMonth ? Colors.grey.shade400 : Colors.blue.shade700,
+              ),
+              onPressed: isPastMonth
+                  ? null  // 過去の月の場合は無効化
+                  : () {
+                      final previousMonth = DateTime(
+                        focusedDay.year,
+                        focusedDay.month - 1,
+                      );
+                      // 過去の月には移動できない
+                      if (!DateTime(previousMonth.year, previousMonth.month)
+                          .isBefore(currentMonth)) {
+                        setState(() {
+                          _focusedDay = previousMonth;
+                        });
+                      }
+                    },
+            ),
           ),
 
-          // 月表示
-          Text(
-            '${focusedDay.year}年 ${focusedDay.month}月',
-            style: const TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
+          // 月表示（中央配置）
+          Expanded(
+            child: Center(
+              child: Text(
+                '${focusedDay.year}年 ${focusedDay.month}月',
+                style: const TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.black87,
+                ),
+              ),
             ),
           ),
 
           // 次月ボタン
-          IconButton(
-            icon: const Icon(Icons.chevron_right, size: 32),
-            onPressed: () {
-              setState(() {
-                _focusedDay = DateTime(
-                  focusedDay.year,
-                  focusedDay.month + 1,
-                );
-              });
-            },
-            color: Colors.black,
+          Container(
+            decoration: BoxDecoration(
+              color: Colors.blue.shade50,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(
+                color: Colors.blue.shade200,
+                width: 1,
+              ),
+            ),
+            child: IconButton(
+              icon: Icon(
+                Icons.chevron_right,
+                size: 28,
+                color: Colors.blue.shade700,
+              ),
+              onPressed: () {
+                setState(() {
+                  _focusedDay = DateTime(
+                    focusedDay.year,
+                    focusedDay.month + 1,
+                  );
+                });
+              },
+            ),
           ),
         ],
       ),
