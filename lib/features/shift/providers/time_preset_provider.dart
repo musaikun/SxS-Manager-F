@@ -84,10 +84,15 @@ class TimePresetNotifier extends StateNotifier<List<TimePreset>> {
 
   // ==================== プリセット操作 ====================
 
-  /// プリセットを追加
+  /// プリセットを追加（最大5個まで）
   void addPreset(TimePreset preset) {
     // 既に存在する場合は追加しない
     if (state.any((p) => p.label == preset.label)) {
+      return;
+    }
+
+    // 最大5個まで
+    if (state.length >= 5) {
       return;
     }
 

@@ -252,24 +252,30 @@ class _DateSelectionScreenState extends ConsumerState<DateSelectionScreen> {
       ),
       body: Column(
         children: [
-          // 店舗セレクター
-          _buildStoreSelector(stores),
-
-          const Divider(height: 1),
-
-          // アクションボタン（平日・全日・土日祝・クリア）
-          _buildActionButtons(),
-
-          const Divider(height: 1),
-
-          // 曜日別選択ボタン
-          _buildWeekdayButtons(),
-
-          const Divider(height: 1),
-
-          // カレンダー
+          // スクロール可能な上部エリア
           Expanded(
-            child: TableCalendar(
+            child: SingleChildScrollView(
+              child: Column(
+                children: [
+                  // 店舗セレクター
+                  _buildStoreSelector(stores),
+
+                  const Divider(height: 1),
+
+                  // アクションボタン（平日・全日・土日祝・クリア）
+                  _buildActionButtons(),
+
+                  const Divider(height: 1),
+
+                  // 曜日別選択ボタン
+                  _buildWeekdayButtons(),
+
+                  const Divider(height: 1),
+
+                  // カレンダー（固定高さ）
+                  SizedBox(
+                    height: 420,
+                    child: TableCalendar(
               firstDay: DateTime.utc(2020, 1, 1),
               lastDay: DateTime.utc(2030, 12, 31),
               focusedDay: _focusedDay,
@@ -507,6 +513,10 @@ class _DateSelectionScreenState extends ConsumerState<DateSelectionScreen> {
                     ),
                   );
                 },
+              ),
+            ),
+          ),
+                ],
               ),
             ),
           ),

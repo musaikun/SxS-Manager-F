@@ -349,22 +349,12 @@ class _TimeSettingModalState extends ConsumerState<TimeSettingModal> {
             ],
 
             // クイック設定
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Text(
-                  'クイック設定（タップで時間を設定）',
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                TextButton.icon(
-                  onPressed: _addCurrentTimeAsPreset,
-                  icon: const Icon(Icons.add, size: 18),
-                  label: const Text('現在の時間を追加', style: TextStyle(fontSize: 12)),
-                ),
-              ],
+            const Text(
+              'クイック設定（タップで時間を設定）',
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.bold,
+              ),
             ),
             const SizedBox(height: 8),
             Wrap(
@@ -383,34 +373,30 @@ class _TimeSettingModalState extends ConsumerState<TimeSettingModal> {
                       },
                       style: OutlinedButton.styleFrom(
                         padding: const EdgeInsets.symmetric(
-                            horizontal: 12, vertical: 8),
+                            horizontal: 16, vertical: 10),
                       ),
                       child: Text(preset.label,
-                          style: const TextStyle(fontSize: 12)),
+                          style: const TextStyle(fontSize: 13)),
                     ),
                     Positioned(
-                      right: -8,
-                      top: -8,
-                      child: Material(
-                        color: Colors.transparent,
-                        child: InkWell(
-                          onTap: () {
-                            ref
-                                .read(timePresetProvider.notifier)
-                                .removePreset(preset.label);
-                          },
-                          customBorder: const CircleBorder(),
-                          child: Container(
-                            padding: const EdgeInsets.all(2),
-                            decoration: const BoxDecoration(
-                              color: Colors.red,
-                              shape: BoxShape.circle,
-                            ),
-                            child: const Icon(
-                              Icons.close,
-                              size: 14,
-                              color: Colors.white,
-                            ),
+                      right: -6,
+                      top: -6,
+                      child: GestureDetector(
+                        onTap: () {
+                          ref
+                              .read(timePresetProvider.notifier)
+                              .removePreset(preset.label);
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.all(4),
+                          decoration: const BoxDecoration(
+                            color: Colors.red,
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(
+                            Icons.close,
+                            size: 16,
+                            color: Colors.white,
                           ),
                         ),
                       ),
@@ -419,6 +405,44 @@ class _TimeSettingModalState extends ConsumerState<TimeSettingModal> {
                 );
               }).toList(),
             ),
+            const SizedBox(height: 12),
+            // 現在の時間を追加ボタン（最大5個まで）
+            if (presets.length < 5)
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: _addCurrentTimeAsPreset,
+                  icon: const Icon(Icons.add, size: 18),
+                  label: const Text('現在の時間を追加'),
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                  ),
+                ),
+              ),
+            if (presets.length >= 5)
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.orange[50],
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.orange.shade200),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.info_outline, size: 16, color: Colors.orange[700]),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'クイック設定は最大5個までです',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.orange[700],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
           ],
         ),
       ),
