@@ -1735,7 +1735,7 @@ class _TimeSettingListPageState extends ConsumerState<_TimeSettingListPage>
                           padding: const EdgeInsets.all(16),
                           decoration: BoxDecoration(
                             color: _isBatchSelectionExpanded
-                                ? Colors.green.shade50
+                                ? Colors.blue.shade50
                                 : Colors.grey.shade50,
                             borderRadius: _isBatchSelectionExpanded
                                 ? const BorderRadius.only(
@@ -1749,7 +1749,7 @@ class _TimeSettingListPageState extends ConsumerState<_TimeSettingListPage>
                               Icon(
                                 Icons.playlist_add_check,
                                 color: _isBatchSelectionExpanded
-                                    ? Colors.green
+                                    ? Colors.blue
                                     : Colors.grey[700],
                               ),
                               const SizedBox(width: 12),
@@ -1762,7 +1762,7 @@ class _TimeSettingListPageState extends ConsumerState<_TimeSettingListPage>
                                     fontSize: 16,
                                     fontWeight: FontWeight.bold,
                                     color: _isBatchSelectionExpanded
-                                        ? Colors.green
+                                        ? Colors.blue
                                         : Colors.grey[700],
                                   ),
                                 ),
@@ -1773,7 +1773,7 @@ class _TimeSettingListPageState extends ConsumerState<_TimeSettingListPage>
                                   Icons.arrow_drop_down,
                                   size: 32,
                                   color: _isBatchSelectionExpanded
-                                      ? Colors.green
+                                      ? Colors.blue
                                       : Colors.grey[700],
                                 ),
                               ),

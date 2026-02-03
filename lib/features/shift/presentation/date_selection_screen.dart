@@ -292,14 +292,24 @@ class _DateSelectionScreenState extends ConsumerState<DateSelectionScreen> {
                 });
               },
 
-              // ヘッダースタイル
+              // ページ変更時の処理（月が変わったとき）
+              onPageChanged: (focusedDay) {
+                setState(() {
+                  _focusedDay = focusedDay;
+                });
+              },
+
+              // 横スワイプのみ有効化（縦スクロールでの月変更を無効化）
+              availableGestures: AvailableGestures.horizontalSwipe,
+
+              // カスタムヘッダー（矢印ボタン付き）
+              headerVisible: true,
               headerStyle: const HeaderStyle(
                 formatButtonVisible: false,
+                leftChevronVisible: false,
+                rightChevronVisible: false,
                 titleCentered: true,
-                titleTextStyle: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                ),
+                headerPadding: EdgeInsets.zero,
               ),
 
               // カレンダースタイル
@@ -342,6 +352,10 @@ class _DateSelectionScreenState extends ConsumerState<DateSelectionScreen> {
 
               // カスタムビルダーで日曜日を赤色に
               calendarBuilders: CalendarBuilders(
+                // カスタムヘッダービルダー（矢印ボタン付き）
+                headerTitleBuilder: (context, day) {
+                  return _buildCustomHeader(day);
+                },
                 // 選択された日付のカスタム表示（四角形 + 店舗ドット）
                 selectedBuilder: (context, day, focusedDay) {
                   // この日付にシフトが登録されている店舗を取得
@@ -796,6 +810,68 @@ class _DateSelectionScreenState extends ConsumerState<DateSelectionScreen> {
     showDialog(
       context: context,
       builder: (context) => _StoreManageDialog(),
+    );
+  }
+
+  // カスタムヘッダー（矢印ボタン付き）
+  Widget _buildCustomHeader(DateTime focusedDay) {
+    final now = DateTime.now();
+    final currentMonth = DateTime(now.year, now.month);
+    final displayMonth = DateTime(focusedDay.year, focusedDay.month);
+
+    // 過去の月かどうかチェック
+    final isPastMonth = displayMonth.isBefore(currentMonth);
+
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          // 前月ボタン
+          IconButton(
+            icon: const Icon(Icons.chevron_left, size: 32),
+            onPressed: isPastMonth
+                ? null  // 過去の月の場合は無効化
+                : () {
+                    final previousMonth = DateTime(
+                      focusedDay.year,
+                      focusedDay.month - 1,
+                    );
+                    // 過去の月には移動できない
+                    if (!DateTime(previousMonth.year, previousMonth.month)
+                        .isBefore(currentMonth)) {
+                      setState(() {
+                        _focusedDay = previousMonth;
+                      });
+                    }
+                  },
+            color: isPastMonth ? Colors.grey[300] : Colors.black,
+          ),
+
+          // 月表示
+          Text(
+            '${focusedDay.year}年 ${focusedDay.month}月',
+            style: const TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+
+          // 次月ボタン
+          IconButton(
+            icon: const Icon(Icons.chevron_right, size: 32),
+            onPressed: () {
+              setState(() {
+                _focusedDay = DateTime(
+                  focusedDay.year,
+                  focusedDay.month + 1,
+                );
+              });
+            },
+            color: Colors.black,
+          ),
+        ],
+      ),
     );
   }
 }
