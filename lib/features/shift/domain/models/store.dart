@@ -51,9 +51,10 @@ class Store {
 }
 
 /// デフォルトの店舗色パレット（掛け持ち機能用）
+/// 背景色（グレー）と被らない見やすい色を選択
 const List<Color> storeColorPalette = [
   Colors.white, // デフォルト店舗（本店）
-  Colors.red, // 掛け持ち先1
-  Colors.blue, // 掛け持ち先2
-  Colors.green, // 掛け持ち先3
+  Color(0xFF1976D2), // 掛け持ち先1（濃い青 - blue.shade700相当）
+  Color(0xFF388E3C), // 掛け持ち先2（濃い緑 - green.shade700相当）
+  Color(0xFFF57C00), // 掛け持ち先3（濃いオレンジ - orange.shade700相当）
 ];
