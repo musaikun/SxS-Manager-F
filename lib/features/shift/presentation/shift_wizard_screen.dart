@@ -746,7 +746,7 @@ class _DateSelectionPageState extends ConsumerState<_DateSelectionPage> {
                   headerPadding: EdgeInsets.zero,
                   titleTextStyle: TextStyle(fontSize: 0, height: 0),
                 ),
-              calendarStyle: CalendarStyle(
+                calendarStyle: CalendarStyle(
                 // デフォルト（薄いグレーの背景）
                 defaultDecoration: BoxDecoration(
                   color: Colors.grey[200],
@@ -796,14 +796,14 @@ class _DateSelectionPageState extends ConsumerState<_DateSelectionPage> {
                   borderRadius: BorderRadius.circular(8),
                 ),
               ),
-              daysOfWeekStyle: DaysOfWeekStyle(
+                daysOfWeekStyle: DaysOfWeekStyle(
                 weekdayStyle: const TextStyle(fontWeight: FontWeight.bold),
                 weekendStyle: const TextStyle(
                   color: Colors.red,
                   fontWeight: FontWeight.bold,
                 ),
               ),
-              calendarBuilders: CalendarBuilders(
+                calendarBuilders: CalendarBuilders(
                 // 選択された日付のカスタム表示
                 selectedBuilder: (context, day, focusedDay) {
                   final timeInfo = _getTimeInfo(day);
@@ -978,6 +978,7 @@ class _DateSelectionPageState extends ConsumerState<_DateSelectionPage> {
                 },
               ),
             ),
+          ),
           ),
 
           const Divider(height: 1),
