@@ -14,7 +14,7 @@ class _HomeScreenState extends State<HomeScreen> {
   // カレンダーの状態
   DateTime _focusedDay = DateTime.now();
   DateTime? _selectedDay;
-  CalendarFormat _calendarFormat = CalendarFormat.month;
+  final CalendarFormat _calendarFormat = CalendarFormat.month;
 
   // 仮のシフトデータ（後でデータベースから取得）
   final Map<DateTime, List<Map<String, dynamic>>> _shifts = {

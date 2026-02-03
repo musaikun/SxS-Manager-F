@@ -29,8 +29,8 @@ class ShiftDateNotifier extends StateNotifier<List<ShiftDate>> {
         state = dates;
       }
     } catch (e) {
-      print('Failed to load shift dates: $e');
       // エラー時はデータをクリア
+      // デバッグ: Failed to load shift dates: $e
       final prefs = await SharedPreferences.getInstance();
       await prefs.remove(_storageKey);
     }
@@ -42,7 +42,7 @@ class ShiftDateNotifier extends StateNotifier<List<ShiftDate>> {
       final jsonList = state.map((date) => date.toJson()).toList();
       await prefs.setString(_storageKey, jsonEncode(jsonList));
     } catch (e) {
-      print('Failed to save shift dates: $e');
+      // デバッグ: Failed to save shift dates: $e
     }
   }
 

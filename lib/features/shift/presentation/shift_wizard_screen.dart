@@ -1107,7 +1107,7 @@ class _DateSelectionPageState extends ConsumerState<_DateSelectionPage> {
                   minimumSize: const Size(0, 0),
                 ),
                 child: Text(
-                  '第${week}週',
+                  '第$week週',
                   style: TextStyle(
                     fontSize: 11,
                     color: !hasWeek
@@ -1188,7 +1188,7 @@ class _DateSelectionPageState extends ConsumerState<_DateSelectionPage> {
                     ),
                   ),
                 );
-              }).toList(),
+              }),
               // 新規プリセット追加ボタン
               OutlinedButton.icon(
                 onPressed: () async {
@@ -1664,9 +1664,11 @@ class _TimeSettingListPageState extends ConsumerState<_TimeSettingListPage>
         _selectedUniqueKeys.clear();
       });
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('${count}件の時間を設定しました')),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('$count件の時間を設定しました')),
+        );
+      }
     }
   }
 
@@ -2685,7 +2687,7 @@ class _MonthAccordionState extends State<_MonthAccordion>
                         },
                       ),
               );
-            }).toList(),
+            }),
         ],
       ),
     );

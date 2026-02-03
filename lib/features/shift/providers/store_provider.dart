@@ -31,7 +31,7 @@ class StoreNotifier extends StateNotifier<List<Store>> {
         _createDefaultStore();
       }
     } catch (e) {
-      print('Failed to load stores: $e');
+      // デバッグ: Failed to load stores: $e
       final prefs = await SharedPreferences.getInstance();
       await prefs.remove(_storageKey);
       _createDefaultStore();
@@ -44,7 +44,7 @@ class StoreNotifier extends StateNotifier<List<Store>> {
       final jsonList = state.map((store) => store.toJson()).toList();
       await prefs.setString(_storageKey, jsonEncode(jsonList));
     } catch (e) {
-      print('Failed to save stores: $e');
+      // デバッグ: Failed to save stores: $e
     }
   }
 

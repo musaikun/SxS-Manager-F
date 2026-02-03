@@ -66,7 +66,7 @@ class TimePresetNotifier extends StateNotifier<List<TimePreset>> {
         state = presets;
       }
     } catch (e) {
-      print('Failed to load time presets: $e');
+      // デバッグ: Failed to load time presets: $e
       // エラー時はデフォルトプリセットを使用
       state = _defaultPresets;
     }
@@ -78,7 +78,7 @@ class TimePresetNotifier extends StateNotifier<List<TimePreset>> {
       final jsonList = state.map((preset) => preset.toJson()).toList();
       await prefs.setString(_storageKey, jsonEncode(jsonList));
     } catch (e) {
-      print('Failed to save time presets: $e');
+      // デバッグ: Failed to save time presets: $e
     }
   }
 

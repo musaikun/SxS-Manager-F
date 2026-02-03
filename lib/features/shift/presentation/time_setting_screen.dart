@@ -605,7 +605,7 @@ class _TimeSettingScreenState extends ConsumerState<TimeSettingScreen> {
                             await _deleteCustomPreset(_customPresets.indexOf(preset));
                           },
                         );
-                      }).toList(),
+                      }),
                     ],
                   ),
                 ],
@@ -929,7 +929,7 @@ class _TimeSettingScreenState extends ConsumerState<TimeSettingScreen> {
                     preset.endMinute,
                     isCustom: true,
                   );
-                }).toList(),
+                }),
               ],
             ),
 
