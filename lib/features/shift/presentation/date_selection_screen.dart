@@ -358,14 +358,6 @@ class _DateSelectionScreenState extends ConsumerState<DateSelectionScreen> {
                       .getShiftsForDate(day);
                   final stores = ref.read(storeProvider);
 
-                  // 店舗カラーマップ（最大4店舗、指定の4色）
-                  final dotColors = [
-                    Colors.red,
-                    Colors.blue,
-                    Colors.yellow,
-                    Colors.green,
-                  ];
-
                   return Center(
                     child: Container(
                       width: 40,  // 固定幅（1桁でも2桁でも同じサイズ）
@@ -392,13 +384,14 @@ class _DateSelectionScreenState extends ConsumerState<DateSelectionScreen> {
                             Row(
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: shifts.take(4).map((shift) {
-                                // 店舗のインデックスを取得してドット色を決定
-                                final storeIndex = stores.indexWhere(
+                                // 店舗の実際の色を取得
+                                final store = stores.firstWhere(
                                   (s) => s.id == shift.storeId,
+                                  orElse: () => stores.first,
                                 );
-                                final dotColor = storeIndex >= 0 && storeIndex < 4
-                                    ? dotColors[storeIndex]
-                                    : Colors.white;
+                                final dotColor = store.color;
+                                // 白ドットの場合は枠線を濃くする
+                                final isWhite = dotColor == Colors.white;
 
                                 return Container(
                                   margin: const EdgeInsets.symmetric(horizontal: 1),
@@ -408,8 +401,10 @@ class _DateSelectionScreenState extends ConsumerState<DateSelectionScreen> {
                                     color: dotColor,
                                     shape: BoxShape.circle,
                                     border: Border.all(
-                                      color: Colors.white.withValues(alpha:0.5),
-                                      width: 0.5,
+                                      color: isWhite
+                                          ? Colors.blue.withValues(alpha:0.8)
+                                          : Colors.white.withValues(alpha:0.5),
+                                      width: isWhite ? 1 : 0.5,
                                     ),
                                   ),
                                 );
@@ -423,43 +418,82 @@ class _DateSelectionScreenState extends ConsumerState<DateSelectionScreen> {
                 },
                 // デフォルトの日付表示をカスタマイズ
                 defaultBuilder: (context, day, focusedDay) {
+                  // この日付にシフトが登録されているか確認
+                  final shifts = ref
+                      .read(shiftDateProvider.notifier)
+                      .getShiftsForDate(day);
+                  final stores = ref.read(storeProvider);
+
+                  Color textColor = Colors.black;
                   // 祝日をピンク色に（最優先）
                   if (_isHoliday(day)) {
-                    return Center(
-                      child: Text(
-                        '${day.day}',
-                        style: const TextStyle(
-                          color: Colors.pink,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    );
+                    textColor = Colors.pink;
                   }
                   // 日曜日を赤色に
-                  if (day.weekday == DateTime.sunday) {
-                    return Center(
-                      child: Text(
-                        '${day.day}',
-                        style: const TextStyle(
-                          color: Colors.red,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    );
+                  else if (day.weekday == DateTime.sunday) {
+                    textColor = Colors.red;
                   }
                   // 土曜日を青色に
-                  if (day.weekday == DateTime.saturday) {
+                  else if (day.weekday == DateTime.saturday) {
+                    textColor = Colors.blue;
+                  }
+
+                  // シフトがある場合はドット付きで表示
+                  if (shifts.isNotEmpty) {
                     return Center(
-                      child: Text(
-                        '${day.day}',
-                        style: const TextStyle(
-                          color: Colors.blue,
-                          fontWeight: FontWeight.w600,
-                        ),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Text(
+                            '${day.day}',
+                            style: TextStyle(
+                              color: textColor,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: shifts.take(4).map((shift) {
+                              final store = stores.firstWhere(
+                                (s) => s.id == shift.storeId,
+                                orElse: () => stores.first,
+                              );
+                              final dotColor = store.color;
+                              final isWhite = dotColor == Colors.white;
+
+                              return Container(
+                                margin: const EdgeInsets.symmetric(horizontal: 1),
+                                width: 5,
+                                height: 5,
+                                decoration: BoxDecoration(
+                                  color: dotColor,
+                                  shape: BoxShape.circle,
+                                  border: Border.all(
+                                    color: isWhite
+                                        ? Colors.grey
+                                        : dotColor.withValues(alpha:0.3),
+                                    width: 0.8,
+                                  ),
+                                ),
+                              );
+                            }).toList(),
+                          ),
+                        ],
                       ),
                     );
                   }
-                  return null; // デフォルトの表示
+
+                  // シフトがない場合は通常表示
+                  return Center(
+                    child: Text(
+                      '${day.day}',
+                      style: TextStyle(
+                        color: textColor,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  );
                 },
                 // 過去の日付を無効化
                 disabledBuilder: (context, day, focusedDay) {
@@ -469,36 +503,6 @@ class _DateSelectionScreenState extends ConsumerState<DateSelectionScreen> {
                       style: TextStyle(
                         color: Colors.grey[400],
                         fontWeight: FontWeight.w400,
-                      ),
-                    ),
-                  );
-                },
-                // 日付の下に複数店舗インジケーターを表示
-                markerBuilder: (context, day, events) {
-                  final count = ref
-                      .read(shiftDateProvider.notifier)
-                      .getShiftCountForDate(day);
-
-                  if (count == 0) return const SizedBox.shrink();
-
-                  return Positioned(
-                    bottom: 1,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 4,
-                        vertical: 1,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Colors.red,
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Text(
-                        '$count',
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 10,
-                          fontWeight: FontWeight.bold,
-                        ),
                       ),
                     ),
                   );
@@ -596,6 +600,8 @@ class _DateSelectionScreenState extends ConsumerState<DateSelectionScreen> {
             children: [
               ...stores.map((store) {
                 final isSelected = _selectedStoreId == store.id;
+                // 白色の場合は特別な処理
+                final isWhite = store.color == Colors.white;
                 return ChoiceChip(
                   label: Text(store.name),
                   selected: isSelected,
@@ -606,14 +612,18 @@ class _DateSelectionScreenState extends ConsumerState<DateSelectionScreen> {
                       });
                     }
                   },
-                  selectedColor: store.color,
-                  backgroundColor: store.color.withValues(alpha:0.15),
+                  selectedColor: isWhite ? Colors.grey[300] : store.color,
+                  backgroundColor: isWhite ? Colors.white : store.color.withValues(alpha:0.15),
                   side: BorderSide(
-                    color: isSelected ? store.color : store.color.withValues(alpha:0.3),
-                    width: 2,
+                    color: isWhite
+                        ? (isSelected ? Colors.grey[600]! : Colors.grey[400]!)
+                        : (isSelected ? store.color : store.color.withValues(alpha:0.3)),
+                    width: isSelected ? 2.5 : 2,
                   ),
                   labelStyle: TextStyle(
-                    color: isSelected ? Colors.white : Colors.black87,
+                    color: isWhite
+                        ? Colors.black87
+                        : (isSelected ? Colors.white : Colors.black87),
                     fontWeight: FontWeight.bold,
                     fontSize: 13,
                   ),
@@ -621,18 +631,19 @@ class _DateSelectionScreenState extends ConsumerState<DateSelectionScreen> {
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                 );
               }),
-              // 店舗追加ボタン
-              ActionChip(
-                avatar: const Icon(Icons.add, size: 18),
-                label: const Text(
-                  '店舗追加',
-                  style: TextStyle(fontWeight: FontWeight.bold),
+              // 店舗追加ボタン（最大4店舗まで）
+              if (stores.length < 4)
+                ActionChip(
+                  avatar: const Icon(Icons.add, size: 18),
+                  label: const Text(
+                    '店舗追加',
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                  onPressed: () => _showAddStoreDialog(context),
+                  elevation: 2,
+                  backgroundColor: Colors.grey[100],
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
                 ),
-                onPressed: () => _showAddStoreDialog(context),
-                elevation: 2,
-                backgroundColor: Colors.grey[100],
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-              ),
             ],
           ),
         ],

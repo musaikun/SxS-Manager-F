@@ -50,14 +50,10 @@ class Store {
   int get hashCode => id.hashCode;
 }
 
-/// デフォルトの店舗色パレット
+/// デフォルトの店舗色パレット（掛け持ち機能用）
 const List<Color> storeColorPalette = [
-  Color(0xFF5C6BC0), // インディゴ
-  Color(0xFFFF7043), // ディープオレンジ
-  Color(0xFF66BB6A), // グリーン
-  Color(0xFFEC407A), // ピンク
-  Color(0xFF42A5F5), // ブルー
-  Color(0xFFAB47BC), // パープル
-  Color(0xFF26A69A), // ティール
-  Color(0xFFFFCA28), // アンバー
+  Colors.white, // デフォルト店舗（本店）
+  Colors.red, // 掛け持ち先1
+  Colors.blue, // 掛け持ち先2
+  Colors.green, // 掛け持ち先3
 ];
