@@ -258,20 +258,7 @@ class _DateSelectionPage extends ConsumerStatefulWidget {
 }
 
 class _DateSelectionPageState extends ConsumerState<_DateSelectionPage> {
-  late PageController _calendarPageController;
   TimePreset? _selectedPreset; // 選択中のクイック設定プリセット
-
-  @override
-  void initState() {
-    super.initState();
-    _calendarPageController = PageController(initialPage: 0);
-  }
-
-  @override
-  void dispose() {
-    _calendarPageController.dispose();
-    super.dispose();
-  }
 
   bool _isSelected(DateTime day) {
     final normalized = ShiftDateUtils.normalizeDate(day);
@@ -442,6 +429,33 @@ class _DateSelectionPageState extends ConsumerState<_DateSelectionPage> {
     });
   }
 
+  // 前月に移動可能かチェック
+  bool _canGoPreviousMonth() {
+    final now = DateTime.now();
+    final currentMonth = DateTime(now.year, now.month);
+    final displayMonth = DateTime(widget.focusedDay.year, widget.focusedDay.month);
+    return !displayMonth.isBefore(currentMonth) && displayMonth != currentMonth;
+  }
+
+  // 前月に移動
+  void _goToPreviousMonth() {
+    if (!_canGoPreviousMonth()) return;
+    final previousMonth = DateTime(
+      widget.focusedDay.year,
+      widget.focusedDay.month - 1,
+    );
+    widget.onFocusedDayChanged(previousMonth);
+  }
+
+  // 次月に移動
+  void _goToNextMonth() {
+    final nextMonth = DateTime(
+      widget.focusedDay.year,
+      widget.focusedDay.month + 1,
+    );
+    widget.onFocusedDayChanged(nextMonth);
+  }
+
   // 共通: 月内の日付を取得
   List<DateTime> _getDatesInMonth(bool Function(DateTime) condition) {
     final firstDay =
@@ -607,20 +621,8 @@ class _DateSelectionPageState extends ConsumerState<_DateSelectionPage> {
     return null;
   }
 
-  // 表示する月のリストを生成（現在月から3ヶ月先まで）
-  List<DateTime> _generateMonthsList() {
-    final now = DateTime.now();
-    final List<DateTime> months = [];
-    for (int i = 0; i < 4; i++) {
-      months.add(DateTime(now.year, now.month + i, 1));
-    }
-    return months;
-  }
-
   @override
   Widget build(BuildContext context) {
-    final monthsList = _generateMonthsList();
-
     return Scaffold(
       body: Column(
         children: [
@@ -642,89 +644,108 @@ class _DateSelectionPageState extends ConsumerState<_DateSelectionPage> {
 
           const Divider(height: 1),
 
-          // スワイプヒント
+          // 月表示ヘッダー（矢印ボタン付き）
           Container(
-            padding: const EdgeInsets.symmetric(vertical: 8),
+            padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              border: Border(
+                bottom: BorderSide(color: Colors.grey.shade300, width: 1),
+              ),
+            ),
             child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(Icons.arrow_upward, size: 16, color: Colors.grey[600]),
-                const SizedBox(width: 8),
-                Text(
-                  '上下にスワイプで月を移動',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Colors.grey[600],
-                    fontWeight: FontWeight.w500,
+                // 前月ボタン
+                Container(
+                  decoration: BoxDecoration(
+                    color: _canGoPreviousMonth()
+                        ? Colors.blue.shade50
+                        : Colors.grey.shade100,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                      color: _canGoPreviousMonth()
+                          ? Colors.blue.shade200
+                          : Colors.grey.shade300,
+                      width: 1,
+                    ),
+                  ),
+                  child: IconButton(
+                    icon: Icon(
+                      Icons.chevron_left,
+                      size: 28,
+                      color: _canGoPreviousMonth()
+                          ? Colors.blue.shade700
+                          : Colors.grey.shade400,
+                    ),
+                    onPressed: _canGoPreviousMonth() ? _goToPreviousMonth : null,
                   ),
                 ),
-                const SizedBox(width: 8),
-                Icon(Icons.arrow_downward, size: 16, color: Colors.grey[600]),
+
+                // 月表示（中央配置）
+                Expanded(
+                  child: Center(
+                    child: Text(
+                      '${widget.focusedDay.year}年 ${widget.focusedDay.month}月',
+                      style: const TextStyle(
+                        fontSize: 22,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.black87,
+                      ),
+                    ),
+                  ),
+                ),
+
+                // 次月ボタン
+                Container(
+                  decoration: BoxDecoration(
+                    color: Colors.blue.shade50,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                      color: Colors.blue.shade200,
+                      width: 1,
+                    ),
+                  ),
+                  child: IconButton(
+                    icon: Icon(
+                      Icons.chevron_right,
+                      size: 28,
+                      color: Colors.blue.shade700,
+                    ),
+                    onPressed: _goToNextMonth,
+                  ),
+                ),
               ],
             ),
           ),
 
-          const Divider(height: 1),
-
-          // 月表示ヘッダー（固定）
-          Container(
-            padding: const EdgeInsets.symmetric(vertical: 12),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              border: Border(
-                bottom: BorderSide(color: Colors.grey[300]!, width: 1),
-              ),
-            ),
-            child: Center(
-              child: Text(
-                '${widget.focusedDay.year}年${widget.focusedDay.month}月',
-                style: const TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ),
-          ),
-
-          // カレンダー（縦PageView）
+          // カレンダー（矢印ボタンで月変更）
           Expanded(
-            child: PageView.builder(
-              controller: _calendarPageController,
-              scrollDirection: Axis.vertical,
-              itemCount: monthsList.length,
-              onPageChanged: (index) {
-                final newMonth = monthsList[index];
-                // focusedDayを現在の月に更新（一括選択ボタンが正しく動作するように）
-                widget.onFocusedDayChanged(newMonth);
-              },
-              itemBuilder: (context, index) {
-                final month = monthsList[index];
-                return Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 8),
-                  child: TableCalendar(
-                    firstDay: month,
-                    lastDay: DateTime(month.year, month.month + 1, 0),
-                    focusedDay: month,
-                    calendarFormat: CalendarFormat.month,
-                    locale: 'ja_JP',
-                    availableGestures: AvailableGestures.none,
-                    selectedDayPredicate: (day) => _isSelected(day),
-                    enabledDayPredicate: (day) {
-                      final today = ShiftDateUtils.normalizeDate(DateTime.now());
-                      return !ShiftDateUtils.normalizeDate(day).isBefore(today);
-                    },
-                    onDaySelected: (selectedDay, focusedDay) {
-                      _toggleDate(selectedDay);
-                    },
-                    headerStyle: const HeaderStyle(
-                      formatButtonVisible: false,
-                      leftChevronVisible: false,
-                      rightChevronVisible: false,
-                      titleCentered: true,
-                      headerMargin: EdgeInsets.zero,
-                      headerPadding: EdgeInsets.zero,
-                      titleTextStyle: TextStyle(fontSize: 0, height: 0),
-                    ),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              child: TableCalendar(
+                firstDay: widget.focusedDay,
+                lastDay: DateTime(widget.focusedDay.year, widget.focusedDay.month + 1, 0),
+                focusedDay: widget.focusedDay,
+                calendarFormat: CalendarFormat.month,
+                locale: 'ja_JP',
+                availableGestures: AvailableGestures.none,
+                selectedDayPredicate: (day) => _isSelected(day),
+                enabledDayPredicate: (day) {
+                  final today = ShiftDateUtils.normalizeDate(DateTime.now());
+                  return !ShiftDateUtils.normalizeDate(day).isBefore(today);
+                },
+                onDaySelected: (selectedDay, focusedDay) {
+                  _toggleDate(selectedDay);
+                },
+                headerStyle: const HeaderStyle(
+                  formatButtonVisible: false,
+                  leftChevronVisible: false,
+                  rightChevronVisible: false,
+                  titleCentered: true,
+                  headerMargin: EdgeInsets.zero,
+                  headerPadding: EdgeInsets.zero,
+                  titleTextStyle: TextStyle(fontSize: 0, height: 0),
+                ),
               calendarStyle: CalendarStyle(
                 // デフォルト（薄いグレーの背景）
                 defaultDecoration: BoxDecoration(
@@ -956,9 +977,6 @@ class _DateSelectionPageState extends ConsumerState<_DateSelectionPage> {
                   );
                 },
               ),
-                  ),
-                );
-              },
             ),
           ),
 
