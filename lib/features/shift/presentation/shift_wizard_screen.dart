@@ -148,7 +148,7 @@ class _ShiftWizardScreenState extends ConsumerState<ShiftWizardScreen> {
   // ページインジケーター
   Widget _buildPageIndicator() {
     return Container(
-      padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 24),
+      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 24),
       decoration: BoxDecoration(
         color: Colors.white,
         boxShadow: [
@@ -846,7 +846,6 @@ class _DateSelectionPageState extends ConsumerState<_DateSelectionPage> {
                 calendarBuilders: CalendarBuilders(
                 // 選択された日付のカスタム表示
                 selectedBuilder: (context, day, focusedDay) {
-                  final timeInfo = _getTimeInfo(day);
                   // この日付にシフトが登録されている店舗を取得
                   final shifts = ref
                       .read(shiftDateProvider.notifier)
@@ -870,18 +869,8 @@ class _DateSelectionPageState extends ConsumerState<_DateSelectionPage> {
                       ),
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
+                        mainAxisSize: MainAxisSize.min,
                         children: [
-                          if (timeInfo != null) ...[
-                            Text(
-                              timeInfo,
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 8,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                            const SizedBox(height: 2),
-                          ],
                           Text(
                             '${day.day}',
                             style: const TextStyle(
@@ -893,34 +882,38 @@ class _DateSelectionPageState extends ConsumerState<_DateSelectionPage> {
                           // 店舗ドット（登録済みの店舗のみ表示）
                           if (shifts.isNotEmpty) ...[
                             const SizedBox(height: 2),
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: shifts.take(4).map((shift) {
-                                // 店舗の実際の色を取得
-                                final store = stores.firstWhere(
-                                  (s) => s.id == shift.storeId,
-                                  orElse: () => stores.first,
-                                );
-                                final dotColor = store.color;
-                                // 白ドットの場合は枠線を濃くする
-                                final isWhite = dotColor == Colors.white;
+                            SizedBox(
+                              height: 6,
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                mainAxisSize: MainAxisSize.min,
+                                children: shifts.take(4).map((shift) {
+                                  // 店舗の実際の色を取得
+                                  final store = stores.firstWhere(
+                                    (s) => s.id == shift.storeId,
+                                    orElse: () => stores.first,
+                                  );
+                                  final dotColor = store.color;
+                                  // 白ドットの場合は枠線を濃くする
+                                  final isWhite = dotColor == Colors.white;
 
-                                return Container(
-                                  margin: const EdgeInsets.symmetric(horizontal: 1),
-                                  width: 6,
-                                  height: 6,
-                                  decoration: BoxDecoration(
-                                    color: dotColor,
-                                    shape: BoxShape.circle,
-                                    border: Border.all(
-                                      color: isWhite
-                                          ? Colors.green.withValues(alpha:0.8)
-                                          : Colors.white.withValues(alpha:0.5),
-                                      width: isWhite ? 1 : 0.5,
+                                  return Container(
+                                    margin: const EdgeInsets.symmetric(horizontal: 1),
+                                    width: 6,
+                                    height: 6,
+                                    decoration: BoxDecoration(
+                                      color: dotColor,
+                                      shape: BoxShape.circle,
+                                      border: Border.all(
+                                        color: isWhite
+                                            ? Colors.green.withValues(alpha:0.8)
+                                            : Colors.white.withValues(alpha:0.5),
+                                        width: isWhite ? 1 : 0.5,
+                                      ),
                                     ),
-                                  ),
-                                );
-                              }).toList(),
+                                  );
+                                }).toList(),
+                              ),
                             ),
                           ],
                         ],
@@ -931,7 +924,6 @@ class _DateSelectionPageState extends ConsumerState<_DateSelectionPage> {
                 // 今日の日付表示
                 todayBuilder: (context, day, focusedDay) {
                   Color textColor = Colors.black;
-                  final timeInfo = _getTimeInfo(day);
                   // この日付にシフトが登録されている店舗を取得
                   final shifts = ref
                       .read(shiftDateProvider.notifier)
@@ -961,18 +953,8 @@ class _DateSelectionPageState extends ConsumerState<_DateSelectionPage> {
                       ),
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
+                        mainAxisSize: MainAxisSize.min,
                         children: [
-                          if (timeInfo != null) ...[
-                            Text(
-                              timeInfo,
-                              style: TextStyle(
-                                color: textColor,
-                                fontSize: 8,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                            const SizedBox(height: 2),
-                          ],
                           Text(
                             '${day.day}',
                             style: TextStyle(
@@ -983,32 +965,36 @@ class _DateSelectionPageState extends ConsumerState<_DateSelectionPage> {
                           // 店舗ドット（登録済みの店舗のみ表示）
                           if (shifts.isNotEmpty) ...[
                             const SizedBox(height: 2),
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: shifts.take(4).map((shift) {
-                                final store = stores.firstWhere(
-                                  (s) => s.id == shift.storeId,
-                                  orElse: () => stores.first,
-                                );
-                                final dotColor = store.color;
-                                final isWhite = dotColor == Colors.white;
+                            SizedBox(
+                              height: 5,
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                mainAxisSize: MainAxisSize.min,
+                                children: shifts.take(4).map((shift) {
+                                  final store = stores.firstWhere(
+                                    (s) => s.id == shift.storeId,
+                                    orElse: () => stores.first,
+                                  );
+                                  final dotColor = store.color;
+                                  final isWhite = dotColor == Colors.white;
 
-                                return Container(
-                                  margin: const EdgeInsets.symmetric(horizontal: 1),
-                                  width: 5,
-                                  height: 5,
-                                  decoration: BoxDecoration(
-                                    color: dotColor,
-                                    shape: BoxShape.circle,
-                                    border: Border.all(
-                                      color: isWhite
-                                          ? Colors.grey
-                                          : dotColor.withValues(alpha:0.3),
-                                      width: 0.8,
+                                  return Container(
+                                    margin: const EdgeInsets.symmetric(horizontal: 1),
+                                    width: 5,
+                                    height: 5,
+                                    decoration: BoxDecoration(
+                                      color: dotColor,
+                                      shape: BoxShape.circle,
+                                      border: Border.all(
+                                        color: isWhite
+                                            ? Colors.grey
+                                            : dotColor.withValues(alpha:0.3),
+                                        width: 0.8,
+                                      ),
                                     ),
-                                  ),
-                                );
-                              }).toList(),
+                                  );
+                                }).toList(),
+                              ),
                             ),
                           ],
                         ],
@@ -1019,7 +1005,6 @@ class _DateSelectionPageState extends ConsumerState<_DateSelectionPage> {
                 // デフォルトの日付表示をカスタマイズ
                 defaultBuilder: (context, day, focusedDay) {
                   Color textColor = Colors.black;
-                  final timeInfo = _getTimeInfo(day);
                   // この日付にシフトが登録されている店舗を取得
                   final shifts = ref
                       .read(shiftDateProvider.notifier)
@@ -1049,18 +1034,8 @@ class _DateSelectionPageState extends ConsumerState<_DateSelectionPage> {
                       ),
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
+                        mainAxisSize: MainAxisSize.min,
                         children: [
-                          if (timeInfo != null) ...[
-                            Text(
-                              timeInfo,
-                              style: TextStyle(
-                                color: textColor,
-                                fontSize: 8,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                            const SizedBox(height: 2),
-                          ],
                           Text(
                             '${day.day}',
                             style: TextStyle(
@@ -1071,32 +1046,36 @@ class _DateSelectionPageState extends ConsumerState<_DateSelectionPage> {
                           // 店舗ドット（登録済みの店舗のみ表示）
                           if (shifts.isNotEmpty) ...[
                             const SizedBox(height: 2),
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: shifts.take(4).map((shift) {
-                                final store = stores.firstWhere(
-                                  (s) => s.id == shift.storeId,
-                                  orElse: () => stores.first,
-                                );
-                                final dotColor = store.color;
-                                final isWhite = dotColor == Colors.white;
+                            SizedBox(
+                              height: 5,
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                mainAxisSize: MainAxisSize.min,
+                                children: shifts.take(4).map((shift) {
+                                  final store = stores.firstWhere(
+                                    (s) => s.id == shift.storeId,
+                                    orElse: () => stores.first,
+                                  );
+                                  final dotColor = store.color;
+                                  final isWhite = dotColor == Colors.white;
 
-                                return Container(
-                                  margin: const EdgeInsets.symmetric(horizontal: 1),
-                                  width: 5,
-                                  height: 5,
-                                  decoration: BoxDecoration(
-                                    color: dotColor,
-                                    shape: BoxShape.circle,
-                                    border: Border.all(
-                                      color: isWhite
-                                          ? Colors.grey
-                                          : dotColor.withValues(alpha:0.3),
-                                      width: 0.8,
+                                  return Container(
+                                    margin: const EdgeInsets.symmetric(horizontal: 1),
+                                    width: 5,
+                                    height: 5,
+                                    decoration: BoxDecoration(
+                                      color: dotColor,
+                                      shape: BoxShape.circle,
+                                      border: Border.all(
+                                        color: isWhite
+                                            ? Colors.grey
+                                            : dotColor.withValues(alpha:0.3),
+                                        width: 0.8,
+                                      ),
                                     ),
-                                  ),
-                                );
-                              }).toList(),
+                                  );
+                                }).toList(),
+                              ),
                             ),
                           ],
                         ],
@@ -1140,7 +1119,7 @@ class _DateSelectionPageState extends ConsumerState<_DateSelectionPage> {
           // 選択数表示（SafeAreaでラップ）
           SafeArea(
             child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               decoration: BoxDecoration(
                 gradient: LinearGradient(
                   colors: [
@@ -1152,7 +1131,7 @@ class _DateSelectionPageState extends ConsumerState<_DateSelectionPage> {
                     const Border(top: BorderSide(color: Colors.grey, width: 1)),
               ),
               child: Row(
-                mainAxisAlignment: MainAxisAlignment.end,
+                mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   // 選択数表示と合計時間
                   Row(
@@ -1198,8 +1177,6 @@ class _DateSelectionPageState extends ConsumerState<_DateSelectionPage> {
                       ),
                     ],
                   ),
-                  // 右側のスペーサー
-                  const SizedBox(width: 60),
                 ],
               ),
             ),
@@ -1223,7 +1200,7 @@ class _DateSelectionPageState extends ConsumerState<_DateSelectionPage> {
     ];
 
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       child: Row(
         children: List.generate(7, (index) {
           // DateTime.sunday=7, Monday=1なので、日曜は7、月〜土は1〜6
@@ -1302,7 +1279,7 @@ class _DateSelectionPageState extends ConsumerState<_DateSelectionPage> {
   // 店舗セレクター
   Widget _buildStoreSelector(List<Store> stores) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
       decoration: BoxDecoration(
         color: Colors.white,
         boxShadow: [
@@ -1331,7 +1308,7 @@ class _DateSelectionPageState extends ConsumerState<_DateSelectionPage> {
               ),
             ],
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 10),
           Wrap(
             spacing: 8,
             runSpacing: 8,
@@ -1564,7 +1541,7 @@ class _DateSelectionPageState extends ConsumerState<_DateSelectionPage> {
     final isWeekendsSelected = _isWeekendsAndHolidaysFullySelected();
 
     return Container(
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
         color: Colors.grey[50],
       ),
