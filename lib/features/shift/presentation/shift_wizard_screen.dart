@@ -655,30 +655,35 @@ class _DateSelectionPageState extends ConsumerState<_DateSelectionPage> {
     return Scaffold(
       body: Column(
         children: [
-          // 店舗セレクター
-          _buildStoreSelector(stores),
+          // スクロール可能な上部エリア
+          Expanded(
+            child: SingleChildScrollView(
+              child: Column(
+                children: [
+                  // 店舗セレクター
+                  _buildStoreSelector(stores),
 
-          const Divider(height: 1),
+                  const Divider(height: 1),
 
-          // クイック設定プリセット選択エリア
-          _buildPresetSelection(),
+                  // クイック設定プリセット選択エリア
+                  _buildPresetSelection(),
 
-          // アクションボタン（平日・全日・土日祝・クリア）
-          _buildActionButtons(),
+                  // アクションボタン（平日・全日・土日祝・クリア）
+                  _buildActionButtons(),
 
-          const Divider(height: 1),
+                  const Divider(height: 1),
 
-          // 曜日別選択ボタン
-          _buildWeekdayButtons(),
+                  // 曜日別選択ボタン
+                  _buildWeekdayButtons(),
 
-          const Divider(height: 1),
+                  const Divider(height: 1),
 
-          // 週別選択ボタン
-          _buildWeekButtons(),
+                  // 週別選択ボタン
+                  _buildWeekButtons(),
 
-          const Divider(height: 1),
+                  const Divider(height: 1),
 
-          // 月表示ヘッダー（矢印ボタン付き）
+                  // 月表示ヘッダー（矢印ボタン付き）
           Container(
             padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
             decoration: BoxDecoration(
@@ -753,7 +758,8 @@ class _DateSelectionPageState extends ConsumerState<_DateSelectionPage> {
           ),
 
           // カレンダー（矢印ボタンで月変更）
-          Expanded(
+          SizedBox(
+            height: 420,
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 8),
               child: TableCalendar(
@@ -1124,72 +1130,78 @@ class _DateSelectionPageState extends ConsumerState<_DateSelectionPage> {
             ),
           ),
           ),
+                ],
+              ),
+            ),
+          ),
 
           const Divider(height: 1),
 
-          // 選択数表示
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [
-                  Colors.green.shade100,
-                  Colors.green.shade50,
-                ],
-              ),
-              border:
-                  const Border(top: BorderSide(color: Colors.grey, width: 1)),
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                // 選択数表示と合計時間
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(6),
-                      decoration: const BoxDecoration(
-                        color: Colors.white,
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Icon(
-                        Icons.check_circle,
-                        size: 20,
-                        color: Colors.green,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          '選択: ${widget.tempSelectedDates.length}日',
-                          style: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.black87,
-                          ),
-                        ),
-                        if (widget.tempSelectedDates.isNotEmpty) ...[
-                          const SizedBox(height: 2),
-                          Text(
-                            '合計: ${_calculateTotalHours()}時間',
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
-                              color: Colors.grey[700],
-                            ),
-                          ),
-                        ],
-                      ],
-                    ),
+          // 選択数表示（SafeAreaでラップ）
+          SafeArea(
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    Colors.green.shade100,
+                    Colors.green.shade50,
                   ],
                 ),
-                // 右側のスペーサー
-                const SizedBox(width: 60),
-              ],
+                border:
+                    const Border(top: BorderSide(color: Colors.grey, width: 1)),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  // 選択数表示と合計時間
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(6),
+                        decoration: const BoxDecoration(
+                          color: Colors.white,
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(
+                          Icons.check_circle,
+                          size: 20,
+                          color: Colors.green,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            '選択: ${widget.tempSelectedDates.length}日',
+                            style: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.black87,
+                            ),
+                          ),
+                          if (widget.tempSelectedDates.isNotEmpty) ...[
+                            const SizedBox(height: 2),
+                            Text(
+                              '合計: ${_calculateTotalHours()}時間',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.grey[700],
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ],
+                  ),
+                  // 右側のスペーサー
+                  const SizedBox(width: 60),
+                ],
+              ),
             ),
           ),
         ],
@@ -1357,7 +1369,60 @@ class _DateSelectionPageState extends ConsumerState<_DateSelectionPage> {
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                 );
               }),
+              // 店舗追加ボタン（最大4店舗まで）
+              if (stores.length < 4)
+                ActionChip(
+                  avatar: const Icon(Icons.add, size: 18),
+                  label: const Text(
+                    '店舗追加',
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                  onPressed: () => _showAddStoreDialog(context),
+                  elevation: 2,
+                  backgroundColor: Colors.grey[100],
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                ),
             ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  // 店舗追加ダイアログ
+  void _showAddStoreDialog(BuildContext context) {
+    final controller = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('店舗追加'),
+        content: TextField(
+          controller: controller,
+          decoration: const InputDecoration(
+            labelText: '店舗名',
+            border: OutlineInputBorder(),
+          ),
+          maxLength: 20,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('キャンセル'),
+          ),
+          TextButton(
+            onPressed: () {
+              if (controller.text.isNotEmpty) {
+                final newStore = ref
+                    .read(storeProvider.notifier)
+                    .addStore(controller.text);
+                setState(() {
+                  _selectedStoreId = newStore.id;
+                });
+                Navigator.pop(context);
+              }
+            },
+            child: const Text('追加'),
           ),
         ],
       ),
@@ -1503,81 +1568,170 @@ class _DateSelectionPageState extends ConsumerState<_DateSelectionPage> {
       decoration: BoxDecoration(
         color: Colors.grey[50],
       ),
-      child: Row(
-        children: [
-          Expanded(
-            child: ElevatedButton.icon(
-              onPressed: _toggleWeekdays,
-              icon: const Icon(Icons.business_center, size: 18),
-              label: const Text('平日',
-                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
-              style: ElevatedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(vertical: 12),
-                elevation: 2,
-                backgroundColor: isWeekdaysSelected ? Colors.green : null,
-                foregroundColor: isWeekdaysSelected ? Colors.white : null,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          // 画面幅が狭い場合（380px未満）は2行レイアウトに変更
+          if (constraints.maxWidth < 380) {
+            return Column(
+              children: [
+                // 1行目：平日・全日・土日祝
+                Row(
+                  children: [
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: _toggleWeekdays,
+                        style: ElevatedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 10),
+                          elevation: 2,
+                          backgroundColor: isWeekdaysSelected ? Colors.green : null,
+                          foregroundColor: isWeekdaysSelected ? Colors.white : null,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                        ),
+                        child: const Text('平日',
+                            style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: _toggleAllDays,
+                        style: ElevatedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 10),
+                          elevation: 2,
+                          backgroundColor: isAllDaysSelected ? Colors.green : null,
+                          foregroundColor: isAllDaysSelected ? Colors.white : null,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                        ),
+                        child: const Text('全日',
+                            style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: _toggleWeekendsAndHolidays,
+                        style: ElevatedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 10),
+                          elevation: 2,
+                          backgroundColor: isWeekendsSelected ? Colors.green : null,
+                          foregroundColor: isWeekendsSelected ? Colors.white : null,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                        ),
+                        child: const Text('土日祝',
+                            style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                      ),
+                    ),
+                  ],
                 ),
-              ),
-            ),
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: ElevatedButton.icon(
-              onPressed: _toggleAllDays,
-              icon: const Icon(Icons.calendar_month, size: 18),
-              label: const Text('全日',
-                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
-              style: ElevatedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(vertical: 12),
-                elevation: 2,
-                backgroundColor: isAllDaysSelected ? Colors.green : null,
-                foregroundColor: isAllDaysSelected ? Colors.white : null,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
+                const SizedBox(height: 6),
+                // 2行目：クリア（幅を広めに）
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    onPressed: _clearSelection,
+                    icon: const Icon(Icons.clear, size: 18, color: Colors.red),
+                    label: const Text('選択をクリア',
+                        style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.red)),
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 10),
+                      side: const BorderSide(color: Colors.red, width: 2),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                  ),
                 ),
-              ),
-            ),
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: ElevatedButton.icon(
-              onPressed: _toggleWeekendsAndHolidays,
-              icon: const Icon(Icons.weekend, size: 18),
-              label: const Text('土日祝',
-                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
-              style: ElevatedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(vertical: 12),
-                elevation: 2,
-                backgroundColor: isWeekendsSelected ? Colors.green : null,
-                foregroundColor: isWeekendsSelected ? Colors.white : null,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
+              ],
+            );
+          } else {
+            // 通常の画面幅では1行レイアウト
+            return Row(
+              children: [
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: _toggleWeekdays,
+                    icon: const Icon(Icons.business_center, size: 18),
+                    label: const Text('平日',
+                        style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
+                    style: ElevatedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      elevation: 2,
+                      backgroundColor: isWeekdaysSelected ? Colors.green : null,
+                      foregroundColor: isWeekdaysSelected ? Colors.white : null,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                  ),
                 ),
-              ),
-            ),
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: OutlinedButton.icon(
-              onPressed: _clearSelection,
-              icon: const Icon(Icons.clear, size: 18, color: Colors.red),
-              label: const Text('クリア',
-                  style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.red)),
-              style: OutlinedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(vertical: 12),
-                side: const BorderSide(color: Colors.red, width: 2),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: _toggleAllDays,
+                    icon: const Icon(Icons.calendar_month, size: 18),
+                    label: const Text('全日',
+                        style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
+                    style: ElevatedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      elevation: 2,
+                      backgroundColor: isAllDaysSelected ? Colors.green : null,
+                      foregroundColor: isAllDaysSelected ? Colors.white : null,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                  ),
                 ),
-              ),
-            ),
-          ),
-        ],
+                const SizedBox(width: 8),
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: _toggleWeekendsAndHolidays,
+                    icon: const Icon(Icons.weekend, size: 18),
+                    label: const Text('土日祝',
+                        style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
+                    style: ElevatedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      elevation: 2,
+                      backgroundColor: isWeekendsSelected ? Colors.green : null,
+                      foregroundColor: isWeekendsSelected ? Colors.white : null,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: _clearSelection,
+                    icon: const Icon(Icons.clear, size: 18, color: Colors.red),
+                    label: const Text('クリア',
+                        style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.red)),
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      side: const BorderSide(color: Colors.red, width: 2),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            );
+          }
+        },
       ),
     );
   }
@@ -2529,74 +2683,76 @@ class _TimeSettingListPageState extends ConsumerState<_TimeSettingListPage>
                   child: _buildShiftListByStore(shiftDates),
                 ),
 
-                // 統計情報表示（下部固定）
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [
-                        Colors.green.shade100,
-                        Colors.green.shade50,
-                      ],
-                    ),
-                    border: const Border(
-                      top: BorderSide(color: Colors.grey, width: 1),
-                    ),
-                  ),
-                  child: Column(
-                    children: [
-                      if (hasUnsetTimes)
-                        FadeTransition(
-                          opacity: _blinkAnimation,
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                            margin: const EdgeInsets.only(bottom: 8),
-                            decoration: BoxDecoration(
-                              color: Colors.red.shade100,
-                              borderRadius: BorderRadius.circular(8),
-                              border: Border.all(color: Colors.red, width: 2),
-                            ),
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Icon(Icons.warning, color: Colors.red, size: 18),
-                                const SizedBox(width: 8),
-                                const Text(
-                                  '時間未設定の日あり',
-                                  style: TextStyle(
-                                    fontSize: 13,
-                                    color: Colors.red,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceAround,
-                        children: [
-                          _buildStatItem(
-                            Icons.calendar_today,
-                            '合計勤務日数',
-                            '${stats['totalDays']}日',
-                          ),
-                          _buildStatItem(
-                            Icons.access_time,
-                            '実労働時間',
-                            '${stats['totalActualHours'].toStringAsFixed(1)}時間',
-                          ),
+                // 統計情報表示（下部固定・SafeAreaでラップ）
+                SafeArea(
+                  child: Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [
+                          Colors.green.shade100,
+                          Colors.green.shade50,
                         ],
                       ),
-                      const SizedBox(height: 6),
-                      Text(
-                        '※休憩時間を差し引いています（労働基準法に基づく）',
-                        style: TextStyle(
-                          fontSize: 10,
-                          color: Colors.grey[700],
-                        ),
+                      border: const Border(
+                        top: BorderSide(color: Colors.grey, width: 1),
                       ),
-                    ],
+                    ),
+                    child: Column(
+                      children: [
+                        if (hasUnsetTimes)
+                          FadeTransition(
+                            opacity: _blinkAnimation,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                              margin: const EdgeInsets.only(bottom: 8),
+                              decoration: BoxDecoration(
+                                color: Colors.red.shade100,
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(color: Colors.red, width: 2),
+                              ),
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(Icons.warning, color: Colors.red, size: 18),
+                                  const SizedBox(width: 8),
+                                  const Text(
+                                    '時間未設定の日あり',
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      color: Colors.red,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceAround,
+                          children: [
+                            _buildStatItem(
+                              Icons.calendar_today,
+                              '合計勤務日数',
+                              '${stats['totalDays']}日',
+                            ),
+                            _buildStatItem(
+                              Icons.access_time,
+                              '実労働時間',
+                              '${stats['totalActualHours'].toStringAsFixed(1)}時間',
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          '※休憩時間を差し引いています（労働基準法に基づく）',
+                          style: TextStyle(
+                            fontSize: 10,
+                            color: Colors.grey[700],
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ],
