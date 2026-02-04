@@ -275,7 +275,9 @@ class _DateSelectionPageState extends ConsumerState<_DateSelectionPage> {
 
   bool _isSelected(DateTime day) {
     final normalized = ShiftDateUtils.normalizeDate(day);
-    return widget.tempSelectedDates.contains(normalized);
+    // shiftDateProviderにその日付のシフトが1つ以上あれば選択状態（緑）
+    final shifts = ref.read(shiftDateProvider);
+    return shifts.any((s) => ShiftDateUtils.normalizeDate(s.date) == normalized);
   }
 
   bool _isHoliday(DateTime day) {
@@ -339,18 +341,18 @@ class _DateSelectionPageState extends ConsumerState<_DateSelectionPage> {
         // 選択追加：現在の店舗でシフトを追加（掛け持ち対応）
         widget.tempSelectedDates.add(normalized);
 
-        // プリセット選択中の場合、即座に時間も設定
+        // 既存のシフトがない場合は追加（プリセットの有無に関わらず）
+        final hasExistingShift = currentShifts.any(
+          (s) => ShiftDateUtils.normalizeDate(s.date) == normalized && s.storeId == _selectedStoreId!,
+        );
+
+        if (!hasExistingShift) {
+          // 新規追加（選択中の店舗で）
+          ref.read(shiftDateProvider.notifier).addDates([normalized], _selectedStoreId!);
+        }
+
+        // プリセット選択中の場合、時間も設定
         if (_selectedPreset != null) {
-          // 既存のシフトがない場合のみ追加
-          final hasExistingShift = currentShifts.any(
-            (s) => ShiftDateUtils.normalizeDate(s.date) == normalized && s.storeId == _selectedStoreId!,
-          );
-
-          if (!hasExistingShift) {
-            // 新規追加（選択中の店舗で）
-            ref.read(shiftDateProvider.notifier).addDates([normalized], _selectedStoreId!);
-          }
-
           // 時間を設定
           final startTime = '${_selectedPreset!.startHour.toString().padLeft(2, '0')}:${_selectedPreset!.startMinute.toString().padLeft(2, '0')}';
           final endTime = '${_selectedPreset!.endHour.toString().padLeft(2, '0')}:${_selectedPreset!.endMinute.toString().padLeft(2, '0')}';
@@ -420,21 +422,21 @@ class _DateSelectionPageState extends ConsumerState<_DateSelectionPage> {
         // 選択
         widget.tempSelectedDates.addAll(validDates);
 
-        // プリセット選択中の場合、追加された日付に時間を設定
-        if (_selectedPreset != null) {
-          final currentShifts = ref.read(shiftDateProvider);
+        final currentShifts = ref.read(shiftDateProvider);
 
-          // 新しく追加された日付のみ処理
-          final newDates = validDates.where((date) {
-            return !currentShifts.any((s) =>
-                ShiftDateUtils.normalizeDate(s.date) == date &&
-                s.storeId == _selectedStoreId!);
-          }).toList();
+        // 新しく追加された日付のみ処理（プリセットの有無に関わらず）
+        final newDates = validDates.where((date) {
+          return !currentShifts.any((s) =>
+              ShiftDateUtils.normalizeDate(s.date) == date &&
+              s.storeId == _selectedStoreId!);
+        }).toList();
 
-          if (newDates.isNotEmpty) {
-            // 新規追加（選択中の店舗で）
-            ref.read(shiftDateProvider.notifier).addDates(newDates, _selectedStoreId!);
+        if (newDates.isNotEmpty) {
+          // 新規追加（選択中の店舗で）
+          ref.read(shiftDateProvider.notifier).addDates(newDates, _selectedStoreId!);
 
+          // プリセット選択中の場合、時間も設定
+          if (_selectedPreset != null) {
             // 時間を設定
             final startTime = '${_selectedPreset!.startHour.toString().padLeft(2, '0')}:${_selectedPreset!.startMinute.toString().padLeft(2, '0')}';
             final endTime = '${_selectedPreset!.endHour.toString().padLeft(2, '0')}:${_selectedPreset!.endMinute.toString().padLeft(2, '0')}';
