@@ -529,24 +529,193 @@ class _DateSelectionPageState extends ConsumerState<_DateSelectionPage> {
   }
 
   void _clearSelection() {
-    setState(() {
-      if (_selectedStoreId == null) return;
+    _showClearOptionsDialog();
+  }
 
+  void _showClearOptionsDialog() {
+    final stores = ref.read(storeProvider);
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.clear, color: Colors.red),
+            SizedBox(width: 8),
+            Text('クリア'),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // すべてクリア
+            ListTile(
+              leading: const Icon(Icons.delete_sweep, color: Colors.red),
+              title: const Text('すべてクリア'),
+              subtitle: const Text('掛け持ち先も時間もすべて削除'),
+              onTap: () {
+                Navigator.pop(context);
+                _clearAll();
+              },
+            ),
+            const Divider(),
+            // 店舗を指定してクリア
+            ListTile(
+              leading: const Icon(Icons.store, color: Colors.orange),
+              title: const Text('店舗を指定してクリア'),
+              subtitle: const Text('指定した店舗の出勤日を削除'),
+              onTap: () {
+                Navigator.pop(context);
+                _showStoreClearDialog(stores);
+              },
+            ),
+            const Divider(),
+            // 時間のみクリア
+            ListTile(
+              leading: const Icon(Icons.access_time, color: Colors.blue),
+              title: const Text('時間のみクリア'),
+              subtitle: const Text('出勤日は残して時間設定を削除'),
+              onTap: () {
+                Navigator.pop(context);
+                _clearTimeOnly();
+              },
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('キャンセル'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showStoreClearDialog(List<Store> stores) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('クリアする店舗を選択'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: stores.map((store) {
+            final isWhite = store.color == Colors.white;
+            return ListTile(
+              leading: CircleAvatar(
+                backgroundColor: isWhite ? Colors.grey[300] : store.color,
+                radius: 16,
+                child: isWhite
+                    ? Icon(Icons.store, color: Colors.grey[600], size: 18)
+                    : null,
+              ),
+              title: Text(store.name),
+              onTap: () {
+                Navigator.pop(context);
+                _clearByStore(store.id);
+              },
+            );
+          }).toList(),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('キャンセル'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // すべてクリア（掛け持ち先も時間も）
+  void _clearAll() {
+    setState(() {
       final currentShifts = ref.read(shiftDateProvider);
 
-      // 選択された日付に対応するシフトデータを削除（選択中の店舗のみ）
+      // 選択された日付に対応するすべてのシフトデータを削除
+      for (final date in widget.tempSelectedDates.toList()) {
+        // この日付のすべてのシフトを削除
+        final shiftsToRemove = currentShifts.where(
+          (s) => ShiftDateUtils.normalizeDate(s.date) == date,
+        ).toList();
+
+        for (final shift in shiftsToRemove) {
+          ref.read(shiftDateProvider.notifier).removeDate(shift.uniqueKey);
+        }
+      }
+
+      widget.tempSelectedDates.clear();
+    });
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('すべてクリアしました')),
+    );
+  }
+
+  // 指定した店舗のシフトをクリア
+  void _clearByStore(String storeId) {
+    setState(() {
+      final currentShifts = ref.read(shiftDateProvider);
+      final storeName = ref.read(storeProvider).firstWhere(
+        (s) => s.id == storeId,
+        orElse: () => ref.read(storeProvider).first,
+      ).name;
+
+      int removedCount = 0;
+
+      // 選択された日付に対応する指定店舗のシフトデータを削除
       for (final date in widget.tempSelectedDates.toList()) {
         try {
           final targetShift = currentShifts.firstWhere(
-            (s) => ShiftDateUtils.normalizeDate(s.date) == date && s.storeId == _selectedStoreId!,
+            (s) => ShiftDateUtils.normalizeDate(s.date) == date && s.storeId == storeId,
           );
           ref.read(shiftDateProvider.notifier).removeDate(targetShift.uniqueKey);
+          removedCount++;
+
+          // この日付に他の店舗のシフトがなければ、tempSelectedDatesからも削除
+          final remainingShifts = ref.read(shiftDateProvider).where(
+            (s) => ShiftDateUtils.normalizeDate(s.date) == date,
+          );
+          if (remainingShifts.isEmpty) {
+            widget.tempSelectedDates.remove(date);
+          }
         } catch (e) {
           // シフトが見つからない場合は何もしない
         }
       }
 
-      widget.tempSelectedDates.clear();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('$storeNameの$removedCount件をクリアしました')),
+      );
+    });
+  }
+
+  // 時間のみクリア（出勤日は残す）
+  void _clearTimeOnly() {
+    setState(() {
+      final currentShifts = ref.read(shiftDateProvider);
+      int clearedCount = 0;
+
+      // 選択された日付のすべてのシフトの時間をクリア
+      for (final date in widget.tempSelectedDates) {
+        final shiftsToUpdate = currentShifts.where(
+          (s) => ShiftDateUtils.normalizeDate(s.date) == date && s.hasTime,
+        ).toList();
+
+        for (final shift in shiftsToUpdate) {
+          ref.read(shiftDateProvider.notifier).updateTime(
+            shift.uniqueKey,
+            null,
+            null,
+            shift.memo,
+          );
+          clearedCount++;
+        }
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('$clearedCount件の時間をクリアしました')),
+      );
     });
   }
 
@@ -844,6 +1013,17 @@ class _DateSelectionPageState extends ConsumerState<_DateSelectionPage> {
                       .getShiftsForDate(day);
                   final stores = ref.read(storeProvider);
 
+                  // 表示する店舗IDのセットを作成（重複を避ける）
+                  final displayStoreIds = <String>{};
+                  // 登録済みのシフトの店舗IDを追加
+                  for (final shift in shifts) {
+                    displayStoreIds.add(shift.storeId);
+                  }
+                  // 現在選択中の店舗IDを追加（選択された日付なので必ず表示）
+                  if (_selectedStoreId != null) {
+                    displayStoreIds.add(_selectedStoreId!);
+                  }
+
                   return Center(
                     child: Container(
                       width: 40,
@@ -871,18 +1051,18 @@ class _DateSelectionPageState extends ConsumerState<_DateSelectionPage> {
                               fontSize: 16,
                             ),
                           ),
-                          // 店舗ドット（登録済みの店舗のみ表示）
-                          if (shifts.isNotEmpty) ...[
+                          // 店舗ドット（登録済み + 選択中の店舗を表示）
+                          if (displayStoreIds.isNotEmpty) ...[
                             const SizedBox(height: 2),
                             SizedBox(
                               height: 6,
                               child: Row(
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 mainAxisSize: MainAxisSize.min,
-                                children: shifts.take(4).map((shift) {
+                                children: displayStoreIds.take(4).map((storeId) {
                                   // 店舗の実際の色を取得
                                   final store = stores.firstWhere(
-                                    (s) => s.id == shift.storeId,
+                                    (s) => s.id == storeId,
                                     orElse: () => stores.first,
                                   );
                                   final dotColor = store.color;
