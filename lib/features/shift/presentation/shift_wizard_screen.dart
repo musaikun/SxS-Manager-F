@@ -707,7 +707,6 @@ class _DateSelectionPageState extends ConsumerState<_DateSelectionPage> {
             shift.uniqueKey,
             null,
             null,
-            shift.memo,
           );
           clearedCount++;
         }
