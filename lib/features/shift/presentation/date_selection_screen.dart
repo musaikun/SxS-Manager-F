@@ -356,7 +356,7 @@ class _DateSelectionScreenState extends ConsumerState<DateSelectionScreen> {
                 headerTitleBuilder: (context, day) {
                   return _buildCustomHeader(day);
                 },
-                // 選択された日付のカスタム表示（四角形 + 店舗ドット）
+                // 選択された日付のカスタム表示（四角形 + 店舗ドット + 時間帯）
                 selectedBuilder: (context, day, focusedDay) {
                   // この日付にシフトが登録されている店舗を取得
                   final shifts = ref
@@ -364,9 +364,12 @@ class _DateSelectionScreenState extends ConsumerState<DateSelectionScreen> {
                       .getShiftsForDate(day);
                   final stores = ref.read(storeProvider);
 
+                  // 時間が設定されているシフトを取得
+                  final shiftsWithTime = shifts.where((s) => s.hasTime).toList();
+
                   return Center(
                     child: Container(
-                      width: 40,  // 固定幅（1桁でも2桁でも同じサイズ）
+                      width: 40,  // 固定幅
                       height: 40, // 固定高さ
                       decoration: BoxDecoration(
                         color: Theme.of(context).colorScheme.primary,
@@ -375,13 +378,56 @@ class _DateSelectionScreenState extends ConsumerState<DateSelectionScreen> {
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
+                          // 時間帯リスト（時間が設定されている場合のみ）
+                          if (shiftsWithTime.isNotEmpty) ...[
+                            ...shiftsWithTime.take(4).map((shift) {
+                              // 店舗の色を取得
+                              final store = stores.firstWhere(
+                                (s) => s.id == shift.storeId,
+                                orElse: () => stores.first,
+                              );
+                              // 時間をフォーマット (例: 12:00 → 12)
+                              final start = shift.startTime!.split(':')[0];
+                              final end = shift.endTime!.split(':')[0];
+                              return Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Container(
+                                    width: 3,
+                                    height: 3,
+                                    decoration: BoxDecoration(
+                                      color: store.color == Colors.white
+                                        ? Colors.blue.withValues(alpha:0.8)
+                                        : store.color,
+                                      shape: BoxShape.circle,
+                                      border: Border.all(
+                                        color: Colors.white.withValues(alpha:0.6),
+                                        width: 0.3,
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 2),
+                                  Text(
+                                    '$start-$end',
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 7,
+                                      fontWeight: FontWeight.bold,
+                                      height: 1.0,
+                                    ),
+                                  ),
+                                ],
+                              );
+                            }).toList(),
+                            const SizedBox(height: 2),
+                          ],
                           // 日付
                           Text(
                             '${day.day}',
                             style: const TextStyle(
                               color: Colors.white,
                               fontWeight: FontWeight.bold,
-                              fontSize: 16,
+                              fontSize: 14,
                             ),
                           ),
                           // 店舗ドット（登録済みの店舗のみ表示）
@@ -426,7 +472,7 @@ class _DateSelectionScreenState extends ConsumerState<DateSelectionScreen> {
                     ),
                   );
                 },
-                // デフォルトの日付表示をカスタマイズ
+                // デフォルトの日付表示をカスタマイズ（ドット + 時間帯）
                 defaultBuilder: (context, day, focusedDay) {
                   // この日付にシフトが登録されているか確認
                   final shifts = ref
@@ -448,20 +494,71 @@ class _DateSelectionScreenState extends ConsumerState<DateSelectionScreen> {
                     textColor = Colors.blue;
                   }
 
+                  // 時間が設定されているシフトを取得
+                  final shiftsWithTime = shifts.where((s) => s.hasTime).toList();
+
                   // シフトがある場合はドット付きで表示
                   if (shifts.isNotEmpty) {
                     return Center(
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
+                          // 時間帯リスト（時間が設定されている場合のみ）
+                          if (shiftsWithTime.isNotEmpty) ...[
+                            ...shiftsWithTime.take(4).map((shift) {
+                              // 店舗の色を取得
+                              final store = stores.firstWhere(
+                                (s) => s.id == shift.storeId,
+                                orElse: () => stores.first,
+                              );
+                              // 時間をフォーマット (例: 12:00 → 12)
+                              final start = shift.startTime!.split(':')[0];
+                              final end = shift.endTime!.split(':')[0];
+                              return Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Container(
+                                    width: 3,
+                                    height: 3,
+                                    decoration: BoxDecoration(
+                                      color: store.color == Colors.white
+                                        ? Colors.grey
+                                        : store.color,
+                                      shape: BoxShape.circle,
+                                      border: Border.all(
+                                        color: store.color == Colors.white
+                                            ? Colors.grey.shade600
+                                            : store.color.withValues(alpha:0.5),
+                                        width: 0.3,
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 2),
+                                  Text(
+                                    '$start-$end',
+                                    style: TextStyle(
+                                      color: textColor,
+                                      fontSize: 7,
+                                      fontWeight: FontWeight.bold,
+                                      height: 1.0,
+                                    ),
+                                  ),
+                                ],
+                              );
+                            }).toList(),
+                            const SizedBox(height: 1),
+                          ],
+                          // 日付
                           Text(
                             '${day.day}',
                             style: TextStyle(
                               color: textColor,
                               fontWeight: FontWeight.w600,
+                              fontSize: 14,
                             ),
                           ),
-                          const SizedBox(height: 2),
+                          const SizedBox(height: 1),
+                          // 店舗ドット（登録済みの店舗のみ表示）
                           SizedBox(
                             height: 5,
                             child: Row(

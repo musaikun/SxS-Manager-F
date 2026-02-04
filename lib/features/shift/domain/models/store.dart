@@ -55,6 +55,6 @@ class Store {
 const List<Color> storeColorPalette = [
   Colors.white, // デフォルト店舗（本店）
   Color(0xFF1976D2), // 掛け持ち先1（濃い青 - blue.shade700相当）
-  Color(0xFF388E3C), // 掛け持ち先2（濃い緑 - green.shade700相当）
+  Color(0xFFFBC02D), // 掛け持ち先2（濃い黄色 - yellow.shade700相当）
   Color(0xFFF57C00), // 掛け持ち先3（濃いオレンジ - orange.shade700相当）
 ];
