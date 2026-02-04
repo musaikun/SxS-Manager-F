@@ -429,7 +429,7 @@ class _DateSelectionScreenState extends ConsumerState<DateSelectionScreen> {
                                   ),
                                 ],
                               );
-                            }).toList(),
+                            }),
                             const SizedBox(height: 2),
                           ],
                           // 日付
@@ -556,7 +556,7 @@ class _DateSelectionScreenState extends ConsumerState<DateSelectionScreen> {
                                   ),
                                 ],
                               );
-                            }).toList(),
+                            }),
                             const SizedBox(height: 1),
                           ],
                           // 日付

@@ -640,28 +640,6 @@ class _DateSelectionPageState extends ConsumerState<_DateSelectionPage> {
     return validDates.isNotEmpty;
   }
 
-  // 該当日付のシフト情報を取得
-  String? _getTimeInfo(DateTime day) {
-    final normalized = ShiftDateUtils.normalizeDate(day);
-    final shiftDates = ref.read(shiftDateProvider);
-
-    // 該当する日付のシフトを探す
-    for (final shift in shiftDates) {
-      final shiftDate = ShiftDateUtils.normalizeDate(shift.date);
-      if (shiftDate == normalized) {
-        // 時間が設定されている場合のみ表示
-        if (shift.startTime != null && shift.endTime != null) {
-          // "HH:MM" から "HH" を抽出
-          final startHour = shift.startTime!.split(':')[0];
-          final endHour = shift.endTime!.split(':')[0];
-          return '$startHour-$endHour';
-        }
-        break;
-      }
-    }
-    return null;
-  }
-
   @override
   Widget build(BuildContext context) {
     final stores = ref.watch(storeProvider);
@@ -2096,150 +2074,6 @@ class _TimeSettingListPageState extends ConsumerState<_TimeSettingListPage>
     );
   }
 
-  // シフトカードを構築
-  Widget _buildShiftCard(dynamic shift, Store store) {
-    final isSelected = _selectedUniqueKeys.contains(shift.uniqueKey);
-    final isWhite = store.color == Colors.white;
-
-    return Card(
-      margin: const EdgeInsets.only(bottom: 12),
-      elevation: isSelected ? 4 : 2,
-      color: isSelected ? Colors.green.shade50 : Colors.white,
-      child: ListTile(
-        leading: _isBatchSelectionExpanded
-            ? Checkbox(
-                value: isSelected,
-                onChanged: (checked) {
-                  setState(() {
-                    if (checked == true) {
-                      _selectedUniqueKeys.add(shift.uniqueKey);
-                    } else {
-                      _selectedUniqueKeys.remove(shift.uniqueKey);
-                    }
-                  });
-                },
-                activeColor: Colors.green,
-              )
-            : CircleAvatar(
-                backgroundColor: isWhite ? Colors.grey[300] : store.color,
-                radius: 20,
-                child: isWhite
-                    ? Icon(Icons.store, color: Colors.grey[700], size: 20)
-                    : null,
-              ),
-        title: Text(
-          '${shift.date.year}/${shift.date.month}/${shift.date.day}',
-          style: const TextStyle(fontWeight: FontWeight.bold),
-        ),
-        subtitle: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            if (shift.startTime != null && shift.endTime != null)
-              Text(
-                '${shift.startTime} - ${shift.endTime}',
-                style: const TextStyle(
-                  color: Colors.black87,
-                ),
-              )
-            else
-              AnimatedBuilder(
-                animation: _blinkAnimation,
-                builder: (context, child) {
-                  return Opacity(
-                    opacity: _blinkAnimation.value,
-                    child: const Text(
-                      '時間未設定',
-                      style: TextStyle(
-                        color: Colors.red,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  );
-                },
-              ),
-            if (shift.memo != null && shift.memo!.isNotEmpty)
-              Padding(
-                padding: const EdgeInsets.only(top: 4),
-                child: Text(
-                  '備考: ${shift.memo}',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Colors.grey[600],
-                  ),
-                ),
-              ),
-          ],
-        ),
-        trailing: _isBatchSelectionExpanded
-            ? null
-            : IconButton(
-                icon: const Icon(Icons.delete, color: Colors.red),
-                onPressed: () {
-                  // 削除確認ダイアログ
-                  showDialog(
-                    context: context,
-                    builder: (context) => AlertDialog(
-                      title: const Text('削除確認'),
-                      content: Text(
-                        '${shift.date.month}/${shift.date.day}のシフトを削除しますか？',
-                      ),
-                      actions: [
-                        TextButton(
-                          onPressed: () => Navigator.pop(context),
-                          child: const Text('キャンセル'),
-                        ),
-                        TextButton(
-                          onPressed: () {
-                            ref
-                                .read(shiftDateProvider.notifier)
-                                .removeDate(shift.uniqueKey);
-                            Navigator.pop(context);
-                          },
-                          child: const Text('削除',
-                              style: TextStyle(color: Colors.red)),
-                        ),
-                      ],
-                    ),
-                  );
-                },
-              ),
-        onTap: _isBatchSelectionExpanded
-            ? () {
-                setState(() {
-                  if (isSelected) {
-                    _selectedUniqueKeys.remove(shift.uniqueKey);
-                  } else {
-                    _selectedUniqueKeys.add(shift.uniqueKey);
-                  }
-                });
-              }
-            : () async {
-                // 個別設定用のモーダルを表示
-                final result = await showDialog<TimeSettingResult>(
-                  context: context,
-                  builder: (context) => TimeSettingModal(
-                    title: '時間設定',
-                    initialStartTime: shift.startTime,
-                    initialEndTime: shift.endTime,
-                    initialMemo: shift.memo,
-                    showMemoField: true,
-                  ),
-                );
-
-                if (result != null) {
-                  ref.read(shiftDateProvider.notifier).updateTimeAndMemo(
-                        shift.uniqueKey,
-                        result.startTime,
-                        result.endTime,
-                        result.memo,
-                      );
-                }
-              },
-      ),
-    );
-  }
-
-
   // 勤務時間の重複・移動時間バリデーション
   List<String> _validateShiftTimes() {
     final errors = <String>[];
@@ -2300,7 +2134,7 @@ class _TimeSettingListPageState extends ConsumerState<_TimeSettingListPage>
           final month = int.parse(dateParts[1]);
           final day = int.parse(dateParts[2]);
           errors.add(
-            '⚠️ ${month}/${day}: ${store1.name}(${shift1.startTime}-${shift1.endTime})と'
+            '⚠️ $month/$day: ${store1.name}(${shift1.startTime}-${shift1.endTime})と'
             '${store2.name}(${shift2.startTime}-${shift2.endTime})の勤務時間が重複しています'
           );
         }
@@ -2310,7 +2144,7 @@ class _TimeSettingListPageState extends ConsumerState<_TimeSettingListPage>
           final month = int.parse(dateParts[1]);
           final day = int.parse(dateParts[2]);
           errors.add(
-            '💡 ${month}/${day}: ${store1.name}(退勤${shift1.endTime})と'
+            '💡 $month/$day: ${store1.name}(退勤${shift1.endTime})と'
             '${store2.name}(出勤${shift2.startTime})の間に移動時間がありません。大丈夫ですか？'
           );
         }
@@ -3147,7 +2981,7 @@ class _ConfirmationPageState extends ConsumerState<_ConfirmationPage> {
           final month = int.parse(dateParts[1]);
           final day = int.parse(dateParts[2]);
           errors.add(
-            '⚠️ ${month}/${day}: ${store1.name}(${shift1.startTime}-${shift1.endTime})と'
+            '⚠️ $month/$day: ${store1.name}(${shift1.startTime}-${shift1.endTime})と'
             '${store2.name}(${shift2.startTime}-${shift2.endTime})の勤務時間が重複しています'
           );
         }
@@ -3157,7 +2991,7 @@ class _ConfirmationPageState extends ConsumerState<_ConfirmationPage> {
           final month = int.parse(dateParts[1]);
           final day = int.parse(dateParts[2]);
           errors.add(
-            '💡 ${month}/${day}: ${store1.name}(退勤${shift1.endTime})と'
+            '💡 $month/$day: ${store1.name}(退勤${shift1.endTime})と'
             '${store2.name}(出勤${shift2.startTime})の間に移動時間がありません。大丈夫ですか？'
           );
         }
