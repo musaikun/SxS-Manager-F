@@ -1014,15 +1014,11 @@ class _DateSelectionPageState extends ConsumerState<_DateSelectionPage> {
                       .getShiftsForDate(day);
                   final stores = ref.read(storeProvider);
 
-                  // 表示する店舗IDのセットを作成（重複を避ける）
+                  // 表示する店舗IDのセットを作成（登録済みシフトのみ）
                   final displayStoreIds = <String>{};
                   // 登録済みのシフトの店舗IDを追加
                   for (final shift in shifts) {
                     displayStoreIds.add(shift.storeId);
-                  }
-                  // 現在選択中の店舗IDを追加（選択された日付なので必ず表示）
-                  if (_selectedStoreId != null) {
-                    displayStoreIds.add(_selectedStoreId!);
                   }
 
                   return Center(
