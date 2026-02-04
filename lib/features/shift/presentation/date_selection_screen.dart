@@ -367,6 +367,17 @@ class _DateSelectionScreenState extends ConsumerState<DateSelectionScreen> {
                   // 時間が設定されているシフトを取得
                   final shiftsWithTime = shifts.where((s) => s.hasTime).toList();
 
+                  // 表示する店舗のリストを作成（登録済み + 現在選択中）
+                  final displayStoreIds = <String>{};
+                  // 登録済みのシフトの店舗IDを追加
+                  for (final shift in shifts) {
+                    displayStoreIds.add(shift.storeId);
+                  }
+                  // 現在選択中の店舗IDを追加（最大4つまで）
+                  if (_selectedStoreId != null && displayStoreIds.length < 4) {
+                    displayStoreIds.add(_selectedStoreId!);
+                  }
+
                   return Center(
                     child: Container(
                       width: 40,  // 固定幅
@@ -430,18 +441,18 @@ class _DateSelectionScreenState extends ConsumerState<DateSelectionScreen> {
                               fontSize: 14,
                             ),
                           ),
-                          // 店舗ドット（登録済みの店舗のみ表示）
-                          if (shifts.isNotEmpty) ...[
+                          // 店舗ドット（登録済み + 選択中の店舗を表示）
+                          if (displayStoreIds.isNotEmpty) ...[
                             const SizedBox(height: 2),
                             SizedBox(
                               height: 6,
                               child: Row(
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 mainAxisSize: MainAxisSize.min,
-                                children: shifts.take(4).map((shift) {
+                                children: displayStoreIds.take(4).map((storeId) {
                                   // 店舗の実際の色を取得
                                   final store = stores.firstWhere(
-                                    (s) => s.id == shift.storeId,
+                                    (s) => s.id == storeId,
                                     orElse: () => stores.first,
                                   );
                                   final dotColor = store.color;
