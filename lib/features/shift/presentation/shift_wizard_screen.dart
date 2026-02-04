@@ -1804,7 +1804,7 @@ class _TimeSettingListPageState extends ConsumerState<_TimeSettingListPage>
       final filteredShifts = _getFilteredShifts();
       final keys = filteredShifts
           .where((shift) => shift.date.weekday == weekday)
-          .map((s) => s.uniqueKey)
+          .map<String>((s) => s.uniqueKey)
           .toList();
 
       // トグル動作
@@ -1823,7 +1823,7 @@ class _TimeSettingListPageState extends ConsumerState<_TimeSettingListPage>
       final filteredShifts = _getFilteredShifts();
       final keys = filteredShifts
           .where((shift) => _isWeekday(shift.date))
-          .map((s) => s.uniqueKey)
+          .map<String>((s) => s.uniqueKey)
           .toList();
 
       // トグル動作
@@ -1842,7 +1842,7 @@ class _TimeSettingListPageState extends ConsumerState<_TimeSettingListPage>
       final filteredShifts = _getFilteredShifts();
       final keys = filteredShifts
           .where((shift) => _isWeekendOrHoliday(shift.date))
-          .map((s) => s.uniqueKey)
+          .map<String>((s) => s.uniqueKey)
           .toList();
 
       // トグル動作
@@ -1861,7 +1861,7 @@ class _TimeSettingListPageState extends ConsumerState<_TimeSettingListPage>
       final filteredShifts = _getFilteredShifts();
       final keys = filteredShifts
           .where((shift) => ShiftDateUtils.getWeekOfMonth(shift.date) == week)
-          .map((s) => s.uniqueKey)
+          .map<String>((s) => s.uniqueKey)
           .toList();
 
       // トグル動作
@@ -1879,7 +1879,7 @@ class _TimeSettingListPageState extends ConsumerState<_TimeSettingListPage>
     final shiftDates = ref.read(shiftDateProvider);
     final keys = shiftDates
         .where((shift) => shift.date.weekday == weekday)
-        .map((s) => s.uniqueKey)
+        .map<String>((s) => s.uniqueKey)
         .toList();
     if (keys.isEmpty) return false;
     return keys.every((k) => _selectedUniqueKeys.contains(k));
@@ -1890,7 +1890,7 @@ class _TimeSettingListPageState extends ConsumerState<_TimeSettingListPage>
     final shiftDates = ref.read(shiftDateProvider);
     final keys = shiftDates
         .where((shift) => _isWeekday(shift.date))
-        .map((s) => s.uniqueKey)
+        .map<String>((s) => s.uniqueKey)
         .toList();
     if (keys.isEmpty) return false;
     return keys.every((k) => _selectedUniqueKeys.contains(k));
@@ -1901,7 +1901,7 @@ class _TimeSettingListPageState extends ConsumerState<_TimeSettingListPage>
     final shiftDates = ref.read(shiftDateProvider);
     final keys = shiftDates
         .where((shift) => _isWeekendOrHoliday(shift.date))
-        .map((s) => s.uniqueKey)
+        .map<String>((s) => s.uniqueKey)
         .toList();
     if (keys.isEmpty) return false;
     return keys.every((k) => _selectedUniqueKeys.contains(k));
@@ -1912,7 +1912,7 @@ class _TimeSettingListPageState extends ConsumerState<_TimeSettingListPage>
     final shiftDates = ref.read(shiftDateProvider);
     final keys = shiftDates
         .where((shift) => ShiftDateUtils.getWeekOfMonth(shift.date) == week)
-        .map((s) => s.uniqueKey)
+        .map<String>((s) => s.uniqueKey)
         .toList();
     if (keys.isEmpty) return false;
     return keys.every((k) => _selectedUniqueKeys.contains(k));
@@ -1968,7 +1968,7 @@ class _TimeSettingListPageState extends ConsumerState<_TimeSettingListPage>
   bool _isAllSelected() {
     final filteredShifts = _getFilteredShifts();
     if (filteredShifts.isEmpty) return false;
-    final filteredKeys = filteredShifts.map((s) => s.uniqueKey).toSet();
+    final filteredKeys = filteredShifts.map<String>((s) => s.uniqueKey).toSet();
     return filteredKeys.every((k) => _selectedUniqueKeys.contains(k));
   }
 
@@ -1977,7 +1977,7 @@ class _TimeSettingListPageState extends ConsumerState<_TimeSettingListPage>
     final filteredShifts = _getFilteredShifts();
     final unsetKeys = filteredShifts
         .where((shift) => shift.startTime == null || shift.endTime == null)
-        .map((s) => s.uniqueKey)
+        .map<String>((s) => s.uniqueKey)
         .toSet();
     if (unsetKeys.isEmpty) return false;
     return unsetKeys.every((k) => _selectedUniqueKeys.contains(k));
@@ -1989,7 +1989,7 @@ class _TimeSettingListPageState extends ConsumerState<_TimeSettingListPage>
       final filteredShifts = _getFilteredShifts();
       final unsetKeys = filteredShifts
           .where((shift) => shift.startTime == null || shift.endTime == null)
-          .map((s) => s.uniqueKey)
+          .map<String>((s) => s.uniqueKey)
           .toList();
 
       // トグル動作
@@ -2642,12 +2642,12 @@ class _TimeSettingListPageState extends ConsumerState<_TimeSettingListPage>
                                     setState(() {
                                       if (_isAllSelected()) {
                                         // フィルタされたシフトの選択を解除
-                                        final filteredKeys = _getFilteredShifts().map((s) => s.uniqueKey).toSet();
+                                        final filteredKeys = _getFilteredShifts().map<String>((s) => s.uniqueKey).toSet();
                                         _selectedUniqueKeys.removeAll(filteredKeys);
                                       } else {
                                         // フィルタされたシフトを全選択
                                         _selectedUniqueKeys.addAll(
-                                            _getFilteredShifts().map((s) => s.uniqueKey));
+                                            _getFilteredShifts().map<String>((s) => s.uniqueKey));
                                       }
                                     });
                                   },
