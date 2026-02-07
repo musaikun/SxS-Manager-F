@@ -1014,6 +1014,9 @@ class _DateSelectionPageState extends ConsumerState<_DateSelectionPage> {
                       .getShiftsForDate(day);
                   final stores = ref.read(storeProvider);
 
+                  // 時間が設定されているシフトを取得
+                  final shiftsWithTime = shifts.where((s) => s.hasTime).toList();
+
                   // 表示する店舗IDのセットを作成（登録済みシフトのみ）
                   final displayStoreIds = <String>{};
                   // 登録済みのシフトの店舗IDを追加
@@ -1040,36 +1043,71 @@ class _DateSelectionPageState extends ConsumerState<_DateSelectionPage> {
                         mainAxisAlignment: MainAxisAlignment.center,
                         mainAxisSize: MainAxisSize.min,
                         children: [
+                          // 時間帯リスト（時間が設定されている場合、上部に表示）
+                          if (shiftsWithTime.isNotEmpty) ...[
+                            ...shiftsWithTime.take(2).map((shift) {
+                              final store = stores.firstWhere(
+                                (s) => s.id == shift.storeId,
+                                orElse: () => stores.first,
+                              );
+                              final start = shift.startTime!.split(':')[0];
+                              final end = shift.endTime!.split(':')[0];
+                              return Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Container(
+                                    width: 3,
+                                    height: 3,
+                                    decoration: BoxDecoration(
+                                      color: store.color == Colors.white
+                                        ? Colors.green.withValues(alpha:0.8)
+                                        : store.color,
+                                      shape: BoxShape.circle,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 1),
+                                  Text(
+                                    '$start-$end',
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 7,
+                                      fontWeight: FontWeight.bold,
+                                      height: 1.0,
+                                    ),
+                                  ),
+                                ],
+                              );
+                            }),
+                          ],
+                          // 日付
                           Text(
                             '${day.day}',
-                            style: const TextStyle(
+                            style: TextStyle(
                               color: Colors.white,
                               fontWeight: FontWeight.bold,
-                              fontSize: 16,
+                              fontSize: shiftsWithTime.isNotEmpty ? 12 : 16,
                             ),
                           ),
-                          // 店舗ドット（登録済み + 選択中の店舗を表示）
+                          // 店舗ドット（登録済みシフトのみ表示）
                           if (displayStoreIds.isNotEmpty) ...[
-                            const SizedBox(height: 2),
+                            const SizedBox(height: 1),
                             SizedBox(
-                              height: 6,
+                              height: 5,
                               child: Row(
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 mainAxisSize: MainAxisSize.min,
                                 children: displayStoreIds.take(4).map((storeId) {
-                                  // 店舗の実際の色を取得
                                   final store = stores.firstWhere(
                                     (s) => s.id == storeId,
                                     orElse: () => stores.first,
                                   );
                                   final dotColor = store.color;
-                                  // 白ドットの場合は枠線を濃くする
                                   final isWhite = dotColor == Colors.white;
 
                                   return Container(
                                     margin: const EdgeInsets.symmetric(horizontal: 1),
-                                    width: 6,
-                                    height: 6,
+                                    width: 5,
+                                    height: 5,
                                     decoration: BoxDecoration(
                                       color: dotColor,
                                       shape: BoxShape.circle,
