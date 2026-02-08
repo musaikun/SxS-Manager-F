@@ -2582,6 +2582,7 @@ class _TimeSettingListPageState extends ConsumerState<_TimeSettingListPage>
                 (s) => s.id == shift.storeId,
                 orElse: () => stores.first,
               );
+              final isWhiteStore = store.color == Colors.white;
               final startParts = shift.startTime!.split(':');
               final endParts = shift.endTime!.split(':');
               final startHour = int.parse(startParts[0]) + int.parse(startParts[1]) / 60.0;
@@ -2601,9 +2602,17 @@ class _TimeSettingListPageState extends ConsumerState<_TimeSettingListPage>
                   child: Text(
                     store.name.length > 6 ? '${store.name.substring(0, 6)}...' : store.name,
                     style: TextStyle(
-                      color: store.color == Colors.white ? Colors.black87 : Colors.white,
+                      color: isWhiteStore ? Colors.grey.shade700 : Colors.white,
                       fontSize: 10,
                       fontWeight: FontWeight.bold,
+                      shadows: isWhiteStore
+                          ? null
+                          : [
+                              Shadow(
+                                color: Colors.black.withValues(alpha: 0.5),
+                                blurRadius: 2,
+                              ),
+                            ],
                     ),
                     overflow: TextOverflow.ellipsis,
                   ),
@@ -4268,29 +4277,54 @@ class _LargeTimelineBarPainter extends CustomPainter {
         (s) => s.id == shift.storeId,
         orElse: () => stores.first,
       );
-      Color barColor = store.color;
-      if (barColor == Colors.white) {
-        barColor = Colors.grey.shade400;
-      }
+      final Color barColor = store.color;
+      final bool isWhite = barColor == Colors.white;
 
       // 位置を計算
       final startX = (startTime / 24.0) * size.width;
       final endX = (endTime / 24.0) * size.width;
 
-      // バーを描画（角丸）
-      final paint = Paint()
-        ..color = barColor
-        ..style = PaintingStyle.fill;
-
       final rect = RRect.fromRectAndRadius(
         Rect.fromLTRB(startX, 2, endX, size.height - 2),
         const Radius.circular(4),
       );
+
+      // 発光エフェクト（グロー）- 外側のぼかし
+      final glowColor = isWhite ? Colors.white : barColor;
+      for (int i = 3; i > 0; i--) {
+        final glowPaint = Paint()
+          ..color = glowColor.withValues(alpha: 0.15 * i)
+          ..style = PaintingStyle.fill
+          ..maskFilter = MaskFilter.blur(BlurStyle.normal, i * 2.0);
+
+        final glowRect = RRect.fromRectAndRadius(
+          Rect.fromLTRB(startX - i, 2 - i, endX + i, size.height - 2 + i),
+          const Radius.circular(4 + i),
+        );
+        canvas.drawRRect(glowRect, glowPaint);
+      }
+
+      // メインのバーを描画
+      final paint = Paint()
+        ..color = isWhite ? Colors.white : barColor
+        ..style = PaintingStyle.fill;
       canvas.drawRRect(rect, paint);
 
-      // 枠線
+      // 内側のハイライト（発光感を強調）
+      final highlightPaint = Paint()
+        ..shader = LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [
+            Colors.white.withValues(alpha: isWhite ? 0.8 : 0.4),
+            Colors.transparent,
+          ],
+        ).createShader(Rect.fromLTRB(startX, 2, endX, size.height / 2));
+      canvas.drawRRect(rect, highlightPaint);
+
+      // 枠線（白の場合は濃いグレーで見えるように）
       final borderPaint = Paint()
-        ..color = Colors.white.withValues(alpha: 0.5)
+        ..color = isWhite ? Colors.grey.shade400 : Colors.white.withValues(alpha: 0.6)
         ..strokeWidth = 1
         ..style = PaintingStyle.stroke;
       canvas.drawRRect(rect, borderPaint);
