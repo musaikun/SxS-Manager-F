@@ -4,6 +4,7 @@ import 'package:table_calendar/table_calendar.dart';
 import '../providers/shift_date_provider.dart';
 import '../providers/store_provider.dart';
 import '../providers/time_preset_provider.dart';
+import '../domain/models/shift_date.dart';
 import '../domain/models/store.dart';
 import '../domain/models/time_preset.dart';
 import '../utils/date_utils.dart';
@@ -720,6 +721,205 @@ class _DateSelectionPageState extends ConsumerState<_DateSelectionPage> {
     });
   }
 
+  // タイムラインバーを構築（24時間を横軸で表現）
+  Widget _buildTimelineBar(List<ShiftDate> shiftsWithTime, List<Store> stores, {bool isSelected = false}) {
+    const double barWidth = 34.0;
+    const double barHeight = 6.0;
+
+    return Container(
+      width: barWidth,
+      height: barHeight,
+      decoration: BoxDecoration(
+        color: isSelected ? Colors.white.withValues(alpha: 0.3) : Colors.grey.withValues(alpha: 0.3),
+        borderRadius: BorderRadius.circular(2),
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(2),
+        child: CustomPaint(
+          size: const Size(barWidth, barHeight),
+          painter: _TimelineBarPainter(
+            shifts: shiftsWithTime,
+            stores: stores,
+            isSelected: isSelected,
+          ),
+        ),
+      ),
+    );
+  }
+
+  // シフト詳細ダイアログを表示（長押し時）
+  void _showShiftDetailDialog(BuildContext context, DateTime day, List<ShiftDate> shifts, List<Store> stores) {
+    final weekdays = ['月', '火', '水', '木', '金', '土', '日'];
+    final weekday = weekdays[day.weekday - 1];
+    final isHoliday = _isHoliday(day);
+    final isSunday = day.weekday == DateTime.sunday;
+    final isSaturday = day.weekday == DateTime.saturday;
+
+    Color dateColor = Colors.black;
+    if (isHoliday) {
+      dateColor = Colors.pink;
+    } else if (isSunday) {
+      dateColor = Colors.red;
+    } else if (isSaturday) {
+      dateColor = Colors.blue;
+    }
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: BoxDecoration(
+                color: Colors.green,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Text(
+                '${day.month}/${day.day}',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 18,
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Text(
+              '($weekday)',
+              style: TextStyle(
+                color: dateColor,
+                fontWeight: FontWeight.bold,
+                fontSize: 16,
+              ),
+            ),
+            if (isHoliday) ...[
+              const SizedBox(width: 4),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: Colors.pink.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: const Text(
+                  '祝',
+                  style: TextStyle(color: Colors.pink, fontSize: 12),
+                ),
+              ),
+            ],
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (shifts.isEmpty)
+              const Text('シフトが登録されていません')
+            else
+              ...shifts.map((shift) {
+                final store = stores.firstWhere(
+                  (s) => s.id == shift.storeId,
+                  orElse: () => stores.first,
+                );
+                final isWhite = store.color == Colors.white;
+
+                return Container(
+                  margin: const EdgeInsets.only(bottom: 8),
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.grey[100],
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                      color: isWhite ? Colors.grey : store.color.withValues(alpha: 0.5),
+                      width: 2,
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      // 店舗カラーインジケーター
+                      Container(
+                        width: 8,
+                        height: 40,
+                        decoration: BoxDecoration(
+                          color: isWhite ? Colors.grey : store.color,
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      // 店舗情報
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              store.name,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 14,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            if (shift.hasTime)
+                              Row(
+                                children: [
+                                  const Icon(Icons.access_time, size: 14, color: Colors.grey),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    '${shift.startTime} 〜 ${shift.endTime}',
+                                    style: const TextStyle(
+                                      fontSize: 13,
+                                      color: Colors.black87,
+                                    ),
+                                  ),
+                                ],
+                              )
+                            else
+                              const Text(
+                                '時間未設定',
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  color: Colors.grey,
+                                  fontStyle: FontStyle.italic,
+                                ),
+                              ),
+                            if (shift.memo != null && shift.memo!.isNotEmpty) ...[
+                              const SizedBox(height: 4),
+                              Row(
+                                children: [
+                                  const Icon(Icons.note, size: 14, color: Colors.grey),
+                                  const SizedBox(width: 4),
+                                  Expanded(
+                                    child: Text(
+                                      shift.memo!,
+                                      style: const TextStyle(
+                                        fontSize: 12,
+                                        color: Colors.grey,
+                                      ),
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              }),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('閉じる'),
+          ),
+        ],
+      ),
+    );
+  }
+
   // 選択された日付の合計勤務時間を計算
   String _calculateTotalHours() {
     if (_selectedStoreId == null) return '0.0';
@@ -1024,106 +1224,80 @@ class _DateSelectionPageState extends ConsumerState<_DateSelectionPage> {
                     displayStoreIds.add(shift.storeId);
                   }
 
-                  return Center(
-                    child: Container(
-                      width: 40,
-                      height: 40,
-                      decoration: BoxDecoration(
-                        color: Colors.green,
-                        borderRadius: BorderRadius.circular(8),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.green.withValues(alpha:0.4),
-                            blurRadius: 8,
-                            spreadRadius: 2,
-                          ),
-                        ],
-                      ),
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          // 時間帯リスト（時間が設定されている場合、上部に表示）
-                          if (shiftsWithTime.isNotEmpty) ...[
-                            ...shiftsWithTime.take(2).map((shift) {
-                              final store = stores.firstWhere(
-                                (s) => s.id == shift.storeId,
-                                orElse: () => stores.first,
-                              );
-                              final start = shift.startTime!.split(':')[0];
-                              final end = shift.endTime!.split(':')[0];
-                              return Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Container(
-                                    width: 3,
-                                    height: 3,
-                                    decoration: BoxDecoration(
-                                      color: store.color == Colors.white
-                                        ? Colors.green.withValues(alpha:0.8)
-                                        : store.color,
-                                      shape: BoxShape.circle,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 1),
-                                  Text(
-                                    '$start-$end',
-                                    style: const TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 7,
-                                      fontWeight: FontWeight.bold,
-                                      height: 1.0,
-                                    ),
-                                  ),
-                                ],
-                              );
-                            }),
-                          ],
-                          // 日付
-                          Text(
-                            '${day.day}',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.bold,
-                              fontSize: shiftsWithTime.isNotEmpty ? 12 : 16,
+                  return GestureDetector(
+                    onLongPress: shifts.isNotEmpty ? () {
+                      _showShiftDetailDialog(context, day, shifts, stores);
+                    } : null,
+                    child: Center(
+                      child: Container(
+                        width: 40,
+                        height: 40,
+                        decoration: BoxDecoration(
+                          color: Colors.green,
+                          borderRadius: BorderRadius.circular(8),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.green.withValues(alpha:0.4),
+                              blurRadius: 8,
+                              spreadRadius: 2,
                             ),
-                          ),
-                          // 店舗ドット（登録済みシフトのみ表示）
-                          if (displayStoreIds.isNotEmpty) ...[
-                            const SizedBox(height: 1),
-                            SizedBox(
-                              height: 5,
-                              child: Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                mainAxisSize: MainAxisSize.min,
-                                children: displayStoreIds.take(4).map((storeId) {
-                                  final store = stores.firstWhere(
-                                    (s) => s.id == storeId,
-                                    orElse: () => stores.first,
-                                  );
-                                  final dotColor = store.color;
-                                  final isWhite = dotColor == Colors.white;
-
-                                  return Container(
-                                    margin: const EdgeInsets.symmetric(horizontal: 1),
-                                    width: 5,
-                                    height: 5,
-                                    decoration: BoxDecoration(
-                                      color: dotColor,
-                                      shape: BoxShape.circle,
-                                      border: Border.all(
-                                        color: isWhite
-                                            ? Colors.green.withValues(alpha:0.8)
-                                            : Colors.white.withValues(alpha:0.5),
-                                        width: isWhite ? 1 : 0.5,
-                                      ),
-                                    ),
-                                  );
-                                }).toList(),
+                          ],
+                        ),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            // タイムラインバー（時間が設定されている場合）
+                            if (shiftsWithTime.isNotEmpty) ...[
+                              _buildTimelineBar(shiftsWithTime, stores, isSelected: true),
+                              const SizedBox(height: 1),
+                            ],
+                            // 日付
+                            Text(
+                              '${day.day}',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                                fontSize: shiftsWithTime.isNotEmpty ? 13 : 16,
                               ),
                             ),
+                            // 店舗ドット（登録済みシフトのみ表示）
+                            if (displayStoreIds.isNotEmpty) ...[
+                              const SizedBox(height: 1),
+                              SizedBox(
+                                height: 5,
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: displayStoreIds.take(4).map((storeId) {
+                                    final store = stores.firstWhere(
+                                      (s) => s.id == storeId,
+                                      orElse: () => stores.first,
+                                    );
+                                    final dotColor = store.color;
+                                    final isWhite = dotColor == Colors.white;
+
+                                    return Container(
+                                      margin: const EdgeInsets.symmetric(horizontal: 1),
+                                      width: 5,
+                                      height: 5,
+                                      decoration: BoxDecoration(
+                                        color: dotColor,
+                                        shape: BoxShape.circle,
+                                        border: Border.all(
+                                          color: isWhite
+                                              ? Colors.green.withValues(alpha:0.8)
+                                              : Colors.white.withValues(alpha:0.5),
+                                          width: isWhite ? 1 : 0.5,
+                                        ),
+                                      ),
+                                    );
+                                  }).toList(),
+                                ),
+                              ),
+                            ],
                           ],
-                        ],
+                        ),
                       ),
                     ),
                   );
@@ -3813,5 +3987,74 @@ class _StoreGroupAccordionState extends State<_StoreGroupAccordion>
         ],
       ),
     );
+  }
+}
+
+/// タイムラインバーを描画するCustomPainter
+/// 24時間を横軸で表現し、勤務時間帯を店舗カラーで塗りつぶす
+class _TimelineBarPainter extends CustomPainter {
+  final List<ShiftDate> shifts;
+  final List<Store> stores;
+  final bool isSelected;
+
+  _TimelineBarPainter({
+    required this.shifts,
+    required this.stores,
+    required this.isSelected,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    // 各シフトの時間帯を描画
+    for (final shift in shifts) {
+      if (!shift.hasTime) continue;
+
+      // 時間をパース
+      final startParts = shift.startTime!.split(':');
+      final endParts = shift.endTime!.split(':');
+      final startHour = int.parse(startParts[0]);
+      final startMinute = int.parse(startParts[1]);
+      final endHour = int.parse(endParts[0]);
+      final endMinute = int.parse(endParts[1]);
+
+      // 分を含めた時間を計算（0-24の範囲）
+      double startTime = startHour + startMinute / 60.0;
+      double endTime = endHour + endMinute / 60.0;
+
+      // 日またぎ対応
+      if (endTime <= startTime) {
+        endTime = 24.0; // 翌日にまたぐ場合は24時まで表示
+      }
+
+      // 店舗の色を取得
+      final store = stores.firstWhere(
+        (s) => s.id == shift.storeId,
+        orElse: () => stores.first,
+      );
+      Color barColor = store.color;
+      if (barColor == Colors.white) {
+        barColor = isSelected ? Colors.white.withValues(alpha: 0.8) : Colors.grey;
+      }
+
+      // 位置を計算（0-24時間を幅に変換）
+      final startX = (startTime / 24.0) * size.width;
+      final endX = (endTime / 24.0) * size.width;
+
+      // バーを描画
+      final paint = Paint()
+        ..color = barColor
+        ..style = PaintingStyle.fill;
+
+      final rect = RRect.fromRectAndRadius(
+        Rect.fromLTRB(startX, 0, endX, size.height),
+        const Radius.circular(1),
+      );
+      canvas.drawRRect(rect, paint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _TimelineBarPainter oldDelegate) {
+    return shifts != oldDelegate.shifts || stores != oldDelegate.stores;
   }
 }
