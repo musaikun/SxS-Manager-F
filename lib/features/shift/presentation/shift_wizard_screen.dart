@@ -1214,12 +1214,8 @@ class _DateSelectionPageState extends ConsumerState<_DateSelectionPage> {
                       .getShiftsForDate(day);
                   final stores = ref.read(storeProvider);
 
-                  // 時間が設定されているシフトを取得
-                  final shiftsWithTime = shifts.where((s) => s.hasTime).toList();
-
                   // 表示する店舗IDのセットを作成（登録済みシフトのみ）
                   final displayStoreIds = <String>{};
-                  // 登録済みのシフトの店舗IDを追加
                   for (final shift in shifts) {
                     displayStoreIds.add(shift.storeId);
                   }
@@ -1247,25 +1243,20 @@ class _DateSelectionPageState extends ConsumerState<_DateSelectionPage> {
                           mainAxisAlignment: MainAxisAlignment.center,
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            // タイムラインバー（時間が設定されている場合）
-                            if (shiftsWithTime.isNotEmpty) ...[
-                              _buildTimelineBar(shiftsWithTime, stores, isSelected: true),
-                              const SizedBox(height: 1),
-                            ],
                             // 日付
                             Text(
                               '${day.day}',
-                              style: TextStyle(
+                              style: const TextStyle(
                                 color: Colors.white,
                                 fontWeight: FontWeight.bold,
-                                fontSize: shiftsWithTime.isNotEmpty ? 13 : 16,
+                                fontSize: 16,
                               ),
                             ),
                             // 店舗ドット（登録済みシフトのみ表示）
                             if (displayStoreIds.isNotEmpty) ...[
-                              const SizedBox(height: 1),
+                              const SizedBox(height: 2),
                               SizedBox(
-                                height: 5,
+                                height: 6,
                                 child: Row(
                                   mainAxisAlignment: MainAxisAlignment.center,
                                   mainAxisSize: MainAxisSize.min,
@@ -1279,8 +1270,8 @@ class _DateSelectionPageState extends ConsumerState<_DateSelectionPage> {
 
                                     return Container(
                                       margin: const EdgeInsets.symmetric(horizontal: 1),
-                                      width: 5,
-                                      height: 5,
+                                      width: 6,
+                                      height: 6,
                                       decoration: BoxDecoration(
                                         color: dotColor,
                                         shape: BoxShape.circle,
@@ -2414,52 +2405,309 @@ class _TimeSettingListPageState extends ConsumerState<_TimeSettingListPage>
     return grouped;
   }
 
-  // 店舗ごとにグループ分けしたシフトリストを構築（アコーディオン形式）
+  // 日付順のフラットリストを構築（タイムラインバー付きカード）
   Widget _buildShiftListByStore(List<dynamic> shiftDates) {
     final stores = ref.watch(storeProvider);
-    final groupedShifts = _groupShiftsByStore(shiftDates);
 
-    // 店舗IDでソート（デフォルト店舗を最初に）
-    final sortedStoreIds = groupedShifts.keys.toList()
+    // 日付ごとにグループ化
+    final Map<String, List<dynamic>> dateGroups = {};
+    for (final shift in shiftDates) {
+      final dateKey = '${shift.date.month}/${shift.date.day}';
+      dateGroups.putIfAbsent(dateKey, () => []);
+      dateGroups[dateKey]!.add(shift);
+    }
+
+    // 日付でソート
+    final sortedDateKeys = dateGroups.keys.toList()
       ..sort((a, b) {
-        if (a == 'default') return -1;
-        if (b == 'default') return 1;
-        return a.compareTo(b);
+        final aShift = dateGroups[a]!.first;
+        final bShift = dateGroups[b]!.first;
+        return aShift.date.compareTo(bShift.date);
       });
 
     return ListView.builder(
-      padding: const EdgeInsets.only(top: 16),
-      itemCount: sortedStoreIds.length,
+      padding: const EdgeInsets.only(top: 8, bottom: 16),
+      itemCount: sortedDateKeys.length,
       itemBuilder: (context, index) {
-        final storeId = sortedStoreIds[index];
-        final storeShifts = groupedShifts[storeId]!;
-        final store = stores.firstWhere(
-          (s) => s.id == storeId,
-          orElse: () => stores.first,
+        final dateKey = sortedDateKeys[index];
+        final shiftsOnDate = dateGroups[dateKey]!;
+        final firstShift = shiftsOnDate.first;
+        final weekdays = ['月', '火', '水', '木', '金', '土', '日'];
+        final weekday = weekdays[firstShift.date.weekday - 1];
+        final isHoliday = JapaneseHolidays.isHoliday(firstShift.date);
+        final isSunday = firstShift.date.weekday == DateTime.sunday;
+        final isSaturday = firstShift.date.weekday == DateTime.saturday;
+
+        Color dateColor = Colors.black87;
+        if (isHoliday) {
+          dateColor = Colors.pink;
+        } else if (isSunday) {
+          dateColor = Colors.red;
+        } else if (isSaturday) {
+          dateColor = Colors.blue;
+        }
+
+        // 一括選択モード時のチェック状態
+        final allSelected = shiftsOnDate.every(
+          (s) => _selectedUniqueKeys.contains(s.uniqueKey),
+        );
+        final someSelected = shiftsOnDate.any(
+          (s) => _selectedUniqueKeys.contains(s.uniqueKey),
         );
 
-        return _StoreGroupAccordion(
-          store: store,
-          shifts: storeShifts,
-          isBatchSelectionExpanded: _isBatchSelectionExpanded,
-          selectedUniqueKeys: _selectedUniqueKeys,
-          onShiftSelectionChanged: (uniqueKey, selected) {
-            setState(() {
-              if (selected) {
-                _selectedUniqueKeys.add(uniqueKey);
+        return Card(
+          margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          elevation: allSelected ? 4 : 2,
+          color: allSelected ? Colors.green.shade50 : Colors.white,
+          child: InkWell(
+            onTap: () {
+              if (_isBatchSelectionExpanded) {
+                // 一括選択モード時はこの日付の全シフトをトグル
+                setState(() {
+                  if (allSelected) {
+                    for (final s in shiftsOnDate) {
+                      _selectedUniqueKeys.remove(s.uniqueKey);
+                    }
+                  } else {
+                    for (final s in shiftsOnDate) {
+                      _selectedUniqueKeys.add(s.uniqueKey);
+                    }
+                  }
+                });
+              } else if (shiftsOnDate.length == 1) {
+                // 1件の場合は直接編集ダイアログ
+                _showShiftEditDialog(shiftsOnDate.first);
               } else {
-                _selectedUniqueKeys.remove(uniqueKey);
+                // 複数件の場合は選択ダイアログ
+                _showMultiShiftEditDialog(shiftsOnDate, stores);
               }
-            });
-          },
-          onShiftTap: (shift) {
-            _showShiftEditDialog(shift);
-          },
-          onShiftDelete: (shift) {
-            ref.read(shiftDateProvider.notifier).removeDate(shift.uniqueKey);
-          },
+            },
+            borderRadius: BorderRadius.circular(12),
+            child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // ヘッダー行：日付 + 曜日 + 一括選択チェック
+                  Row(
+                    children: [
+                      if (_isBatchSelectionExpanded) ...[
+                        Checkbox(
+                          value: allSelected,
+                          tristate: true,
+                          onChanged: (checked) {
+                            setState(() {
+                              if (checked == true) {
+                                for (final s in shiftsOnDate) {
+                                  _selectedUniqueKeys.add(s.uniqueKey);
+                                }
+                              } else {
+                                for (final s in shiftsOnDate) {
+                                  _selectedUniqueKeys.remove(s.uniqueKey);
+                                }
+                              }
+                            });
+                          },
+                          activeColor: Colors.green,
+                        ),
+                      ],
+                      Text(
+                        '${firstShift.date.month}/${firstShift.date.day}',
+                        style: TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                          color: dateColor,
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        '($weekday)',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: dateColor,
+                        ),
+                      ),
+                      if (isHoliday) ...[
+                        const SizedBox(width: 6),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: Colors.pink.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: const Text(
+                            '祝',
+                            style: TextStyle(color: Colors.pink, fontSize: 11, fontWeight: FontWeight.bold),
+                          ),
+                        ),
+                      ],
+                      const Spacer(),
+                      // 削除ボタン
+                      if (!_isBatchSelectionExpanded)
+                        IconButton(
+                          icon: const Icon(Icons.delete_outline, color: Colors.red, size: 20),
+                          onPressed: () {
+                            for (final s in shiftsOnDate) {
+                              ref.read(shiftDateProvider.notifier).removeDate(s.uniqueKey);
+                            }
+                          },
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  // タイムラインバー（大きく表示）
+                  _buildLargeTimelineBar(shiftsOnDate.cast<ShiftDate>(), stores),
+                  // 時間未設定の警告
+                  if (shiftsOnDate.any((s) => s.startTime == null))
+                    Padding(
+                      padding: const EdgeInsets.only(top: 8),
+                      child: AnimatedBuilder(
+                        animation: _blinkAnimation,
+                        builder: (context, child) {
+                          return Opacity(
+                            opacity: _blinkAnimation.value,
+                            child: Row(
+                              children: [
+                                const Icon(Icons.warning_amber, color: Colors.orange, size: 16),
+                                const SizedBox(width: 4),
+                                Text(
+                                  '時間未設定のシフトがあります',
+                                  style: TextStyle(
+                                    color: Colors.orange.shade800,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ),
         );
       },
+    );
+  }
+
+  // 大きなタイムラインバーを構築（Page 2用）
+  Widget _buildLargeTimelineBar(List<ShiftDate> shifts, List<Store> stores) {
+    final shiftsWithTime = shifts.where((s) => s.hasTime).toList();
+
+    return Container(
+      width: double.infinity,
+      height: 32,
+      decoration: BoxDecoration(
+        color: Colors.grey.shade200,
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(6),
+        child: Stack(
+          children: [
+            // 時間目盛り（背景）
+            CustomPaint(
+              size: const Size(double.infinity, 32),
+              painter: _TimelineScalePainter(),
+            ),
+            // シフトバー
+            CustomPaint(
+              size: const Size(double.infinity, 32),
+              painter: _LargeTimelineBarPainter(
+                shifts: shiftsWithTime,
+                stores: stores,
+              ),
+            ),
+            // 店舗ラベル（バー内に表示）
+            ...shiftsWithTime.map((shift) {
+              final store = stores.firstWhere(
+                (s) => s.id == shift.storeId,
+                orElse: () => stores.first,
+              );
+              final startParts = shift.startTime!.split(':');
+              final endParts = shift.endTime!.split(':');
+              final startHour = int.parse(startParts[0]) + int.parse(startParts[1]) / 60.0;
+              double endHour = int.parse(endParts[0]) + int.parse(endParts[1]) / 60.0;
+              if (endHour <= startHour) endHour = 24.0;
+
+              final startPercent = startHour / 24.0;
+              final endPercent = endHour / 24.0;
+              final widthPercent = endPercent - startPercent;
+
+              return Positioned(
+                left: startPercent * (MediaQuery.of(context).size.width - 48), // カードのパディングを考慮
+                width: widthPercent * (MediaQuery.of(context).size.width - 48),
+                top: 0,
+                bottom: 0,
+                child: Center(
+                  child: Text(
+                    store.name.length > 6 ? '${store.name.substring(0, 6)}...' : store.name,
+                    style: TextStyle(
+                      color: store.color == Colors.white ? Colors.black87 : Colors.white,
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              );
+            }),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // 複数シフトの編集ダイアログ
+  void _showMultiShiftEditDialog(List<dynamic> shifts, List<Store> stores) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('${shifts.first.date.month}/${shifts.first.date.day} のシフト'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: shifts.map((shift) {
+            final store = stores.firstWhere(
+              (s) => s.id == shift.storeId,
+              orElse: () => stores.first,
+            );
+            final isWhite = store.color == Colors.white;
+
+            return ListTile(
+              leading: CircleAvatar(
+                backgroundColor: isWhite ? Colors.grey[300] : store.color,
+                radius: 16,
+                child: isWhite
+                    ? Icon(Icons.store, color: Colors.grey[600], size: 16)
+                    : null,
+              ),
+              title: Text(store.name),
+              subtitle: Text(
+                shift.hasTime ? '${shift.startTime} - ${shift.endTime}' : '時間未設定',
+                style: TextStyle(
+                  color: shift.hasTime ? null : Colors.red,
+                ),
+              ),
+              onTap: () {
+                Navigator.pop(context);
+                _showShiftEditDialog(shift);
+              },
+            );
+          }).toList(),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('閉じる'),
+          ),
+        ],
+      ),
     );
   }
 
@@ -4055,6 +4303,119 @@ class _TimelineBarPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _TimelineBarPainter oldDelegate) {
+    return shifts != oldDelegate.shifts || stores != oldDelegate.stores;
+  }
+}
+
+/// 時間目盛りを描画するPainter（Page 2の大きなタイムラインバー用）
+class _TimelineScalePainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = Colors.grey.shade400
+      ..strokeWidth = 1;
+
+    final textPainter = TextPainter(
+      textDirection: TextDirection.ltr,
+    );
+
+    // 6時間ごとに目盛りを描画（0, 6, 12, 18, 24）
+    for (int hour = 0; hour <= 24; hour += 6) {
+      final x = (hour / 24.0) * size.width;
+
+      // 縦線
+      canvas.drawLine(
+        Offset(x, 0),
+        Offset(x, size.height),
+        paint,
+      );
+
+      // 時間ラベル
+      if (hour < 24) {
+        textPainter.text = TextSpan(
+          text: '$hour',
+          style: TextStyle(
+            color: Colors.grey.shade600,
+            fontSize: 8,
+          ),
+        );
+        textPainter.layout();
+        textPainter.paint(canvas, Offset(x + 2, size.height - 10));
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
+/// 大きなタイムラインバーを描画するPainter（Page 2用）
+class _LargeTimelineBarPainter extends CustomPainter {
+  final List<ShiftDate> shifts;
+  final List<Store> stores;
+
+  _LargeTimelineBarPainter({
+    required this.shifts,
+    required this.stores,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    for (final shift in shifts) {
+      if (!shift.hasTime) continue;
+
+      // 時間をパース
+      final startParts = shift.startTime!.split(':');
+      final endParts = shift.endTime!.split(':');
+      final startHour = int.parse(startParts[0]);
+      final startMinute = int.parse(startParts[1]);
+      final endHour = int.parse(endParts[0]);
+      final endMinute = int.parse(endParts[1]);
+
+      double startTime = startHour + startMinute / 60.0;
+      double endTime = endHour + endMinute / 60.0;
+
+      // 日またぎ対応
+      if (endTime <= startTime) {
+        endTime = 24.0;
+      }
+
+      // 店舗の色を取得
+      final store = stores.firstWhere(
+        (s) => s.id == shift.storeId,
+        orElse: () => stores.first,
+      );
+      Color barColor = store.color;
+      if (barColor == Colors.white) {
+        barColor = Colors.grey.shade400;
+      }
+
+      // 位置を計算
+      final startX = (startTime / 24.0) * size.width;
+      final endX = (endTime / 24.0) * size.width;
+
+      // バーを描画（角丸）
+      final paint = Paint()
+        ..color = barColor
+        ..style = PaintingStyle.fill;
+
+      final rect = RRect.fromRectAndRadius(
+        Rect.fromLTRB(startX, 2, endX, size.height - 2),
+        const Radius.circular(4),
+      );
+      canvas.drawRRect(rect, paint);
+
+      // 枠線
+      final borderPaint = Paint()
+        ..color = Colors.white.withValues(alpha: 0.5)
+        ..strokeWidth = 1
+        ..style = PaintingStyle.stroke;
+      canvas.drawRRect(rect, borderPaint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _LargeTimelineBarPainter oldDelegate) {
     return shifts != oldDelegate.shifts || stores != oldDelegate.stores;
   }
 }
