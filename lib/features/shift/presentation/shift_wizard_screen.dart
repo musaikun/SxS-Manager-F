@@ -721,32 +721,6 @@ class _DateSelectionPageState extends ConsumerState<_DateSelectionPage> {
     });
   }
 
-  // タイムラインバーを構築（24時間を横軸で表現）
-  Widget _buildTimelineBar(List<ShiftDate> shiftsWithTime, List<Store> stores, {bool isSelected = false}) {
-    const double barWidth = 34.0;
-    const double barHeight = 6.0;
-
-    return Container(
-      width: barWidth,
-      height: barHeight,
-      decoration: BoxDecoration(
-        color: isSelected ? Colors.white.withValues(alpha: 0.3) : Colors.grey.withValues(alpha: 0.3),
-        borderRadius: BorderRadius.circular(2),
-      ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(2),
-        child: CustomPaint(
-          size: const Size(barWidth, barHeight),
-          painter: _TimelineBarPainter(
-            shifts: shiftsWithTime,
-            stores: stores,
-            isSelected: isSelected,
-          ),
-        ),
-      ),
-    );
-  }
-
   // シフト詳細ダイアログを表示（長押し時）
   void _showShiftDetailDialog(BuildContext context, DateTime day, List<ShiftDate> shifts, List<Store> stores) {
     final weekdays = ['月', '火', '水', '木', '金', '土', '日'];
@@ -2386,25 +2360,6 @@ class _TimeSettingListPageState extends ConsumerState<_TimeSettingListPage>
     };
   }
 
-  // 店舗ごとにシフトをグループ化
-  Map<String, List<dynamic>> _groupShiftsByStore(List<dynamic> shifts) {
-    final Map<String, List<dynamic>> grouped = {};
-
-    for (final shift in shifts) {
-      if (!grouped.containsKey(shift.storeId)) {
-        grouped[shift.storeId] = [];
-      }
-      grouped[shift.storeId]!.add(shift);
-    }
-
-    // 各グループ内で日付順にソート
-    for (final key in grouped.keys) {
-      grouped[key]!.sort((a, b) => a.date.compareTo(b.date));
-    }
-
-    return grouped;
-  }
-
   // 日付順のフラットリストを構築（タイムラインバー付きカード）
   Widget _buildShiftListByStore(List<dynamic> shiftDates) {
     final stores = ref.watch(storeProvider);
@@ -2449,9 +2404,6 @@ class _TimeSettingListPageState extends ConsumerState<_TimeSettingListPage>
 
         // 一括選択モード時のチェック状態
         final allSelected = shiftsOnDate.every(
-          (s) => _selectedUniqueKeys.contains(s.uniqueKey),
-        );
-        final someSelected = shiftsOnDate.any(
           (s) => _selectedUniqueKeys.contains(s.uniqueKey),
         );
 
@@ -4235,75 +4187,6 @@ class _StoreGroupAccordionState extends State<_StoreGroupAccordion>
         ],
       ),
     );
-  }
-}
-
-/// タイムラインバーを描画するCustomPainter
-/// 24時間を横軸で表現し、勤務時間帯を店舗カラーで塗りつぶす
-class _TimelineBarPainter extends CustomPainter {
-  final List<ShiftDate> shifts;
-  final List<Store> stores;
-  final bool isSelected;
-
-  _TimelineBarPainter({
-    required this.shifts,
-    required this.stores,
-    required this.isSelected,
-  });
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    // 各シフトの時間帯を描画
-    for (final shift in shifts) {
-      if (!shift.hasTime) continue;
-
-      // 時間をパース
-      final startParts = shift.startTime!.split(':');
-      final endParts = shift.endTime!.split(':');
-      final startHour = int.parse(startParts[0]);
-      final startMinute = int.parse(startParts[1]);
-      final endHour = int.parse(endParts[0]);
-      final endMinute = int.parse(endParts[1]);
-
-      // 分を含めた時間を計算（0-24の範囲）
-      double startTime = startHour + startMinute / 60.0;
-      double endTime = endHour + endMinute / 60.0;
-
-      // 日またぎ対応
-      if (endTime <= startTime) {
-        endTime = 24.0; // 翌日にまたぐ場合は24時まで表示
-      }
-
-      // 店舗の色を取得
-      final store = stores.firstWhere(
-        (s) => s.id == shift.storeId,
-        orElse: () => stores.first,
-      );
-      Color barColor = store.color;
-      if (barColor == Colors.white) {
-        barColor = isSelected ? Colors.white.withValues(alpha: 0.8) : Colors.grey;
-      }
-
-      // 位置を計算（0-24時間を幅に変換）
-      final startX = (startTime / 24.0) * size.width;
-      final endX = (endTime / 24.0) * size.width;
-
-      // バーを描画
-      final paint = Paint()
-        ..color = barColor
-        ..style = PaintingStyle.fill;
-
-      final rect = RRect.fromRectAndRadius(
-        Rect.fromLTRB(startX, 0, endX, size.height),
-        const Radius.circular(1),
-      );
-      canvas.drawRRect(rect, paint);
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant _TimelineBarPainter oldDelegate) {
-    return shifts != oldDelegate.shifts || stores != oldDelegate.stores;
   }
 }
 
