@@ -4298,8 +4298,8 @@ class _LargeTimelineBarPainter extends CustomPainter {
           ..maskFilter = MaskFilter.blur(BlurStyle.normal, i * 2.0);
 
         final glowRect = RRect.fromRectAndRadius(
-          Rect.fromLTRB(startX - i, 2 - i, endX + i, size.height - 2 + i),
-          const Radius.circular(4 + i),
+          Rect.fromLTRB(startX - i, 2.0 - i, endX + i, size.height - 2.0 + i),
+          Radius.circular(4.0 + i),
         );
         canvas.drawRRect(glowRect, glowPaint);
       }
