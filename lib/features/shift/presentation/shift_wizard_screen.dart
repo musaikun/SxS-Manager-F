@@ -4203,27 +4203,32 @@ class _StoreGroupAccordionState extends State<_StoreGroupAccordion>
 class _TimelineScalePainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
-    final paint = Paint()
+    final majorPaint = Paint()
       ..color = Colors.grey.shade400
       ..strokeWidth = 1;
+
+    final minorPaint = Paint()
+      ..color = Colors.grey.shade300
+      ..strokeWidth = 0.5;
 
     final textPainter = TextPainter(
       textDirection: TextDirection.ltr,
     );
 
-    // 6時間ごとに目盛りを描画（0, 6, 12, 18, 24）
-    for (int hour = 0; hour <= 24; hour += 6) {
+    // 3時間ごとに目盛りを描画（0, 3, 6, 9, 12, 15, 18, 21, 24）
+    for (int hour = 0; hour <= 24; hour += 3) {
       final x = (hour / 24.0) * size.width;
+      final isMajor = hour % 6 == 0; // 6時間ごとは太い線
 
       // 縦線
       canvas.drawLine(
         Offset(x, 0),
         Offset(x, size.height),
-        paint,
+        isMajor ? majorPaint : minorPaint,
       );
 
-      // 時間ラベル
-      if (hour < 24) {
+      // 時間ラベル（6時間ごとのみ）
+      if (hour < 24 && isMajor) {
         textPainter.text = TextSpan(
           text: '$hour',
           style: TextStyle(
@@ -4253,10 +4258,12 @@ class _LargeTimelineBarPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
+    // 時間範囲を計算（重複検出用）
+    final List<_TimeRange> timeRanges = [];
+
     for (final shift in shifts) {
       if (!shift.hasTime) continue;
 
-      // 時間をパース
       final startParts = shift.startTime!.split(':');
       final endParts = shift.endTime!.split(':');
       final startHour = int.parse(startParts[0]);
@@ -4267,12 +4274,34 @@ class _LargeTimelineBarPainter extends CustomPainter {
       double startTime = startHour + startMinute / 60.0;
       double endTime = endHour + endMinute / 60.0;
 
-      // 日またぎ対応
       if (endTime <= startTime) {
         endTime = 24.0;
       }
 
-      // 店舗の色を取得
+      timeRanges.add(_TimeRange(startTime, endTime, shift.storeId));
+    }
+
+    // 重複している時間帯を検出
+    final List<_TimeRange> overlaps = _detectOverlaps(timeRanges);
+
+    // 各シフトのバーを描画
+    for (final shift in shifts) {
+      if (!shift.hasTime) continue;
+
+      final startParts = shift.startTime!.split(':');
+      final endParts = shift.endTime!.split(':');
+      final startHour = int.parse(startParts[0]);
+      final startMinute = int.parse(startParts[1]);
+      final endHour = int.parse(endParts[0]);
+      final endMinute = int.parse(endParts[1]);
+
+      double startTime = startHour + startMinute / 60.0;
+      double endTime = endHour + endMinute / 60.0;
+
+      if (endTime <= startTime) {
+        endTime = 24.0;
+      }
+
       final store = stores.firstWhere(
         (s) => s.id == shift.storeId,
         orElse: () => stores.first,
@@ -4280,7 +4309,6 @@ class _LargeTimelineBarPainter extends CustomPainter {
       final Color barColor = store.color;
       final bool isWhite = barColor == Colors.white;
 
-      // 位置を計算
       final startX = (startTime / 24.0) * size.width;
       final endX = (endTime / 24.0) * size.width;
 
@@ -4289,50 +4317,80 @@ class _LargeTimelineBarPainter extends CustomPainter {
         const Radius.circular(4),
       );
 
-      // 発光エフェクト（グロー）- 外側のぼかし
-      final glowColor = isWhite ? Colors.white : barColor;
-      for (int i = 3; i > 0; i--) {
-        final glowPaint = Paint()
-          ..color = glowColor.withValues(alpha: 0.15 * i)
-          ..style = PaintingStyle.fill
-          ..maskFilter = MaskFilter.blur(BlurStyle.normal, i * 2.0);
-
-        final glowRect = RRect.fromRectAndRadius(
-          Rect.fromLTRB(startX - i, 2.0 - i, endX + i, size.height - 2.0 + i),
-          Radius.circular(4.0 + i),
-        );
-        canvas.drawRRect(glowRect, glowPaint);
-      }
-
       // メインのバーを描画
       final paint = Paint()
         ..color = isWhite ? Colors.white : barColor
         ..style = PaintingStyle.fill;
       canvas.drawRRect(rect, paint);
 
-      // 内側のハイライト（発光感を強調）
-      final highlightPaint = Paint()
-        ..shader = LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [
-            Colors.white.withValues(alpha: isWhite ? 0.8 : 0.4),
-            Colors.transparent,
-          ],
-        ).createShader(Rect.fromLTRB(startX, 2, endX, size.height / 2));
-      canvas.drawRRect(rect, highlightPaint);
-
-      // 枠線（白の場合は濃いグレーで見えるように）
+      // 枠線
       final borderPaint = Paint()
-        ..color = isWhite ? Colors.grey.shade400 : Colors.white.withValues(alpha: 0.6)
+        ..color = isWhite ? Colors.grey.shade400 : Colors.black.withValues(alpha: 0.3)
         ..strokeWidth = 1
         ..style = PaintingStyle.stroke;
       canvas.drawRRect(rect, borderPaint);
     }
+
+    // 重複部分を赤枠で表示
+    for (final overlap in overlaps) {
+      final startX = (overlap.start / 24.0) * size.width;
+      final endX = (overlap.end / 24.0) * size.width;
+
+      final overlapRect = RRect.fromRectAndRadius(
+        Rect.fromLTRB(startX, 0, endX, size.height),
+        const Radius.circular(4),
+      );
+
+      // 赤い枠線
+      final overlapBorderPaint = Paint()
+        ..color = Colors.red
+        ..strokeWidth = 2
+        ..style = PaintingStyle.stroke;
+      canvas.drawRRect(overlapRect, overlapBorderPaint);
+
+      // 薄い赤背景
+      final overlapFillPaint = Paint()
+        ..color = Colors.red.withValues(alpha: 0.1)
+        ..style = PaintingStyle.fill;
+      canvas.drawRRect(overlapRect, overlapFillPaint);
+    }
+  }
+
+  // 重複している時間帯を検出
+  List<_TimeRange> _detectOverlaps(List<_TimeRange> ranges) {
+    final List<_TimeRange> overlaps = [];
+
+    for (int i = 0; i < ranges.length; i++) {
+      for (int j = i + 1; j < ranges.length; j++) {
+        final a = ranges[i];
+        final b = ranges[j];
+
+        // 重複チェック
+        if (a.start < b.end && b.start < a.end) {
+          final overlapStart = a.start > b.start ? a.start : b.start;
+          final overlapEnd = a.end < b.end ? a.end : b.end;
+          overlaps.add(_TimeRange(overlapStart, overlapEnd, ''));
+        }
+      }
+    }
+
+    return overlaps;
   }
 
   @override
   bool shouldRepaint(covariant _LargeTimelineBarPainter oldDelegate) {
+    return shifts != oldDelegate.shifts || stores != oldDelegate.stores;
+  }
+}
+
+// 時間範囲を表すヘルパークラス
+class _TimeRange {
+  final double start;
+  final double end;
+  final String storeId;
+
+  _TimeRange(this.start, this.end, this.storeId);
+}
     return shifts != oldDelegate.shifts || stores != oldDelegate.stores;
   }
 }
