@@ -1673,9 +1673,24 @@ class _DateSelectionPageState extends ConsumerState<_DateSelectionPage> {
     final storeIds = <String>{};
 
     for (final shift in shiftDates) {
-      if (shift.date.month == _currentMonth.month &&
-          shift.date.year == _currentMonth.year &&
-          _getWeekOfMonth(shift.date) == week) {
+      if (shift.date.month == widget.focusedDay.month &&
+          shift.date.year == widget.focusedDay.year &&
+          ShiftDateUtils.getWeekOfMonth(shift.date) == week) {
+        storeIds.add(shift.storeId);
+      }
+    }
+
+    return stores.where((s) => storeIds.contains(s.id)).toList();
+  }
+
+  // 指定曜日にシフトがある店舗リストを取得
+  List<Store> _getStoresWithShiftsForWeekday(int weekday) {
+    final shiftDates = ref.read(shiftDateProvider);
+    final stores = ref.read(storeProvider);
+    final storeIds = <String>{};
+
+    for (final shift in shiftDates) {
+      if (shift.date.weekday == weekday) {
         storeIds.add(shift.storeId);
       }
     }
