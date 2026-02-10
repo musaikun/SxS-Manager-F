@@ -2457,35 +2457,54 @@ class _TimeSettingListPageState extends ConsumerState<_TimeSettingListPage>
   Widget _buildShiftListByStore(List<dynamic> shiftDates) {
     final stores = ref.watch(storeProvider);
 
-    // 日付ごとにグループ化
-    final Map<String, List<dynamic>> dateGroups = {};
+    // 日付ごとにグループ化（DateTime型で管理）
+    final Map<DateTime, List<dynamic>> dateGroups = {};
     for (final shift in shiftDates) {
-      final dateKey = '${shift.date.month}/${shift.date.day}';
-      dateGroups.putIfAbsent(dateKey, () => []);
-      dateGroups[dateKey]!.add(shift);
+      final normalized = ShiftDateUtils.normalizeDate(shift.date);
+      dateGroups.putIfAbsent(normalized, () => []);
+      dateGroups[normalized]!.add(shift);
     }
 
     // 日付でソート
-    final sortedDateKeys = dateGroups.keys.toList()
-      ..sort((a, b) {
-        final aShift = dateGroups[a]!.first;
-        final bShift = dateGroups[b]!.first;
-        return aShift.date.compareTo(bShift.date);
-      });
+    final sortedDates = dateGroups.keys.toList()..sort();
+    final dateSet = sortedDates.toSet(); // 高速検索用
 
     return ListView.builder(
       controller: _scrollController,
       padding: const EdgeInsets.only(top: 8, bottom: 16),
-      itemCount: sortedDateKeys.length,
+      itemCount: sortedDates.length,
       itemBuilder: (context, index) {
-        final dateKey = sortedDateKeys[index];
-        final shiftsOnDate = dateGroups[dateKey]!;
+        final currentDate = sortedDates[index];
+        final shiftsOnDate = dateGroups[currentDate]!;
         final firstShift = shiftsOnDate.first;
         final weekdays = ['月', '火', '水', '木', '金', '土', '日'];
-        final weekday = weekdays[firstShift.date.weekday - 1];
-        final isHoliday = JapaneseHolidays.isHoliday(firstShift.date);
-        final isSunday = firstShift.date.weekday == DateTime.sunday;
-        final isSaturday = firstShift.date.weekday == DateTime.saturday;
+        final weekday = weekdays[currentDate.weekday - 1];
+        final isHoliday = JapaneseHolidays.isHoliday(currentDate);
+        final isSunday = currentDate.weekday == DateTime.sunday;
+        final isSaturday = currentDate.weekday == DateTime.saturday;
+
+        // 前日からの継続シフトを検出
+        final previousDate = currentDate.subtract(const Duration(days: 1));
+        final carryoverShifts = <ShiftDate>[];
+        if (dateSet.contains(previousDate)) {
+          for (final shift in dateGroups[previousDate]!) {
+            if (shift.hasTime) {
+              final startParts = shift.startTime!.split(':');
+              final endParts = shift.endTime!.split(':');
+              final startHour = int.parse(startParts[0]);
+              final endHour = int.parse(endParts[0]);
+              final endMinute = int.parse(endParts[1]);
+              // 終了時刻が開始時刻より小さい場合、翌日にまたがる
+              if (endHour < startHour || (endHour == 0 && endMinute > 0)) {
+                carryoverShifts.add(shift as ShiftDate);
+              }
+            }
+          }
+        }
+
+        // 翌日のカードが存在するかチェック（日またぎ表示判定用）
+        final nextDate = currentDate.add(const Duration(days: 1));
+        final hasNextDayCard = dateSet.contains(nextDate);
 
         Color dateColor = Colors.black87;
         if (isHoliday) {
@@ -2605,7 +2624,12 @@ class _TimeSettingListPageState extends ConsumerState<_TimeSettingListPage>
                   ),
                   const SizedBox(height: 8),
                   // タイムラインバー（大きく表示）
-                  _buildLargeTimelineBar(shiftsOnDate.cast<ShiftDate>(), stores),
+                  _buildLargeTimelineBar(
+                    shiftsOnDate.cast<ShiftDate>(),
+                    stores,
+                    carryoverShifts: carryoverShifts,
+                    hasNextDayCard: hasNextDayCard,
+                  ),
                   // 時間未設定の警告
                   if (shiftsOnDate.any((s) => s.startTime == null))
                     Padding(
@@ -2702,11 +2726,17 @@ class _TimeSettingListPageState extends ConsumerState<_TimeSettingListPage>
   }
 
   // 大きなタイムラインバーを構築（Page 2用・レーン分割対応）
-  Widget _buildLargeTimelineBar(List<ShiftDate> shifts, List<Store> stores) {
+  Widget _buildLargeTimelineBar(
+    List<ShiftDate> shifts,
+    List<Store> stores, {
+    List<ShiftDate> carryoverShifts = const [],
+    bool hasNextDayCard = false,
+  }) {
     final shiftsWithTime = shifts.where((s) => s.hasTime).toList();
-    final laneCount = shiftsWithTime.isEmpty ? 1 : shiftsWithTime.length;
-    // レーン数に応じて高さを調整（1レーン: 32px、最大4レーンまで）
-    final barHeight = (24.0 * laneCount.clamp(1, 4)).toDouble();
+    // 継続シフトも含めたレーン数を計算
+    final totalLaneCount = (shiftsWithTime.length + carryoverShifts.length).clamp(1, 4);
+    // レーン数に応じて高さを調整（1レーン: 24px、最大4レーンまで）
+    final barHeight = (24.0 * totalLaneCount).toDouble();
 
     return Container(
       width: double.infinity,
@@ -2724,18 +2754,62 @@ class _TimeSettingListPageState extends ConsumerState<_TimeSettingListPage>
               size: Size(double.infinity, barHeight),
               painter: _TimelineScalePainter(),
             ),
-            // シフトバー（レーン分割）
+            // 前日からの継続シフト（半透明で表示）
+            ...carryoverShifts.asMap().entries.map((entry) {
+              final index = entry.key;
+              final shift = entry.value;
+              final store = stores.firstWhere(
+                (s) => s.id == shift.storeId,
+                orElse: () => stores.first,
+              );
+              final endParts = shift.endTime!.split(':');
+              final endHour = int.parse(endParts[0]) + int.parse(endParts[1]) / 60.0;
+
+              final endPercent = endHour / 24.0;
+              final laneHeight = barHeight / totalLaneCount;
+              final laneTop = index * laneHeight;
+
+              return Positioned(
+                left: 0,
+                width: endPercent * (MediaQuery.of(context).size.width - 48),
+                top: laneTop + 2,
+                height: laneHeight - 4,
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: (store.color == Colors.white ? Colors.grey.shade400 : store.color).withValues(alpha: 0.4),
+                    borderRadius: BorderRadius.circular(4),
+                    border: Border.all(
+                      color: store.color == Colors.white ? Colors.grey : store.color,
+                      width: 1,
+                    ),
+                  ),
+                  child: Center(
+                    child: Text(
+                      '← 前日から',
+                      style: TextStyle(
+                        color: Colors.grey.shade700,
+                        fontSize: 9,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ),
+              );
+            }),
+            // 当日のシフトバー（レーン分割）
             CustomPaint(
               size: Size(double.infinity, barHeight),
               painter: _LargeTimelineBarPainter(
                 shifts: shiftsWithTime,
                 stores: stores,
-                laneCount: laneCount,
+                laneCount: totalLaneCount,
+                laneOffset: carryoverShifts.length,
+                hasNextDayCard: hasNextDayCard,
               ),
             ),
             // 店舗ラベル（レーンごとに表示）
             ...shiftsWithTime.asMap().entries.map((entry) {
-              final index = entry.key;
+              final index = entry.key + carryoverShifts.length; // 継続シフト分オフセット
               final shift = entry.value;
               final store = stores.firstWhere(
                 (s) => s.id == shift.storeId,
@@ -2746,27 +2820,34 @@ class _TimeSettingListPageState extends ConsumerState<_TimeSettingListPage>
               final endParts = shift.endTime!.split(':');
               final startHour = int.parse(startParts[0]) + int.parse(startParts[1]) / 60.0;
               double endHour = int.parse(endParts[0]) + int.parse(endParts[1]) / 60.0;
-              if (endHour <= startHour) endHour = 24.0;
+              final spansMidnight = endHour <= startHour;
+              if (spansMidnight) endHour = 24.0;
 
               final startPercent = startHour / 24.0;
               final endPercent = endHour / 24.0;
               final widthPercent = endPercent - startPercent;
 
               // レーンの位置を計算
-              final laneHeight = barHeight / laneCount;
+              final laneHeight = barHeight / totalLaneCount;
               final laneTop = index * laneHeight;
 
+              // 翌日にまたがる場合のラベル
+              String labelText = store.name.length > 6 ? '${store.name.substring(0, 6)}...' : store.name;
+              if (spansMidnight && !hasNextDayCard) {
+                labelText = '$labelText →翌';
+              }
+
               return Positioned(
-                left: startPercent * (MediaQuery.of(context).size.width - 48), // カードのパディングを考慮
+                left: startPercent * (MediaQuery.of(context).size.width - 48),
                 width: widthPercent * (MediaQuery.of(context).size.width - 48),
                 top: laneTop,
                 height: laneHeight,
                 child: Center(
                   child: Text(
-                    store.name.length > 6 ? '${store.name.substring(0, 6)}...' : store.name,
+                    labelText,
                     style: TextStyle(
                       color: isWhiteStore ? Colors.grey.shade700 : Colors.white,
-                      fontSize: 10,
+                      fontSize: 9,
                       fontWeight: FontWeight.bold,
                       shadows: isWhiteStore
                           ? null
@@ -4806,11 +4887,15 @@ class _LargeTimelineBarPainter extends CustomPainter {
   final List<ShiftDate> shifts;
   final List<Store> stores;
   final int laneCount;
+  final int laneOffset; // 継続シフト分のオフセット
+  final bool hasNextDayCard; // 翌日のカードが存在するか
 
   _LargeTimelineBarPainter({
     required this.shifts,
     required this.stores,
     required this.laneCount,
+    this.laneOffset = 0,
+    this.hasNextDayCard = false,
   });
 
   @override
@@ -4835,7 +4920,8 @@ class _LargeTimelineBarPainter extends CustomPainter {
       double startTime = startHour + startMinute / 60.0;
       double endTime = endHour + endMinute / 60.0;
 
-      if (endTime <= startTime) {
+      final spansMidnight = endTime <= startTime;
+      if (spansMidnight) {
         endTime = 24.0;
       }
 
@@ -4849,9 +4935,10 @@ class _LargeTimelineBarPainter extends CustomPainter {
       final startX = (startTime / 24.0) * size.width;
       final endX = (endTime / 24.0) * size.width;
 
-      // レーンの位置を計算
-      final laneTop = i * laneHeight + padding;
-      final laneBottom = (i + 1) * laneHeight - padding;
+      // レーンの位置を計算（オフセット考慮）
+      final laneIndex = i + laneOffset;
+      final laneTop = laneIndex * laneHeight + padding;
+      final laneBottom = (laneIndex + 1) * laneHeight - padding;
 
       final rect = RRect.fromRectAndRadius(
         Rect.fromLTRB(startX, laneTop, endX, laneBottom),
@@ -4863,6 +4950,28 @@ class _LargeTimelineBarPainter extends CustomPainter {
         ..color = isWhite ? Colors.white : barColor
         ..style = PaintingStyle.fill;
       canvas.drawRRect(rect, paint);
+
+      // 日またぎの場合、右端に斜線パターンを描画
+      if (spansMidnight) {
+        canvas.save();
+        canvas.clipRRect(rect);
+        final stripeWidth = 4.0;
+        final stripePaint = Paint()
+          ..color = (isWhite ? Colors.grey : Colors.black).withValues(alpha: 0.3)
+          ..strokeWidth = 2
+          ..style = PaintingStyle.stroke;
+
+        // 右端20pxに斜線を描画
+        final stripeAreaStart = endX - 20;
+        for (double x = stripeAreaStart; x < endX + 20; x += stripeWidth) {
+          canvas.drawLine(
+            Offset(x, laneTop),
+            Offset(x - 10, laneBottom),
+            stripePaint,
+          );
+        }
+        canvas.restore();
+      }
 
       // 枠線
       final borderPaint = Paint()
@@ -4930,7 +5039,10 @@ class _LargeTimelineBarPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _LargeTimelineBarPainter oldDelegate) {
-    return shifts != oldDelegate.shifts || stores != oldDelegate.stores;
+    return shifts != oldDelegate.shifts ||
+        stores != oldDelegate.stores ||
+        laneOffset != oldDelegate.laneOffset ||
+        hasNextDayCard != oldDelegate.hasNextDayCard;
   }
 }
 
