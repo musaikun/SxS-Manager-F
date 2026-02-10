@@ -3073,15 +3073,20 @@ class _TimeSettingListPageState extends ConsumerState<_TimeSettingListPage>
                                     child: Text('すべての店舗', style: TextStyle(fontWeight: FontWeight.bold)),
                                   ),
                                   ...ref.read(storeProvider).map((store) {
+                                    // この店舗にシフトが存在するかチェック
+                                    final allShifts = ref.read(shiftDateProvider);
+                                    final hasShifts = allShifts.any((s) => s.storeId == store.id);
+
                                     return DropdownMenuItem<String?>(
                                       value: store.id,
+                                      enabled: hasShifts,
                                       child: Row(
                                         children: [
                                           Container(
                                             width: 12,
                                             height: 12,
                                             decoration: BoxDecoration(
-                                              color: store.color,
+                                              color: hasShifts ? store.color : Colors.grey.shade300,
                                               shape: BoxShape.circle,
                                               border: Border.all(
                                                 color: store.color == Colors.white ? Colors.grey : Colors.transparent,
@@ -3090,7 +3095,22 @@ class _TimeSettingListPageState extends ConsumerState<_TimeSettingListPage>
                                             ),
                                           ),
                                           const SizedBox(width: 8),
-                                          Text(store.name),
+                                          Text(
+                                            store.name,
+                                            style: TextStyle(
+                                              color: hasShifts ? null : Colors.grey,
+                                            ),
+                                          ),
+                                          if (!hasShifts) ...[
+                                            const SizedBox(width: 8),
+                                            Text(
+                                              '(なし)',
+                                              style: TextStyle(
+                                                color: Colors.grey.shade500,
+                                                fontSize: 12,
+                                              ),
+                                            ),
+                                          ],
                                         ],
                                       ),
                                     );
