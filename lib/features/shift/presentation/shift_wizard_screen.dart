@@ -275,8 +275,18 @@ class _DateSelectionPageState extends ConsumerState<_DateSelectionPage> {
   }
 
   bool _isSelected(DateTime day) {
+    if (_selectedStoreId == null) return false;
     final normalized = ShiftDateUtils.normalizeDate(day);
-    // shiftDateProviderにその日付のシフトが1つ以上あれば選択状態（緑）
+    // 現在選択中の店舗でその日付にシフトがあれば選択状態（緑）
+    final shifts = ref.read(shiftDateProvider);
+    return shifts.any((s) =>
+        ShiftDateUtils.normalizeDate(s.date) == normalized &&
+        s.storeId == _selectedStoreId!);
+  }
+
+  // 任意の店舗でその日付にシフトがあるかチェック（ドット表示用）
+  bool _hasAnyShift(DateTime day) {
+    final normalized = ShiftDateUtils.normalizeDate(day);
     final shifts = ref.read(shiftDateProvider);
     return shifts.any((s) => ShiftDateUtils.normalizeDate(s.date) == normalized);
   }
@@ -906,40 +916,56 @@ class _DateSelectionPageState extends ConsumerState<_DateSelectionPage> {
     return totalHours.toStringAsFixed(1);
   }
 
-  // 該当する曜日が全て選択されているかチェック
+  // 該当する曜日が全て選択されているかチェック（現在選択中の店舗のみ）
   bool _isWeekdayFullySelected(int weekday) {
+    if (_selectedStoreId == null) return false;
     final dates = _getDatesInMonth((day) => day.weekday == weekday);
     final today = ShiftDateUtils.normalizeDate(DateTime.now());
     final validDates = dates.where((d) => !d.isBefore(today)).toList();
     if (validDates.isEmpty) return false;
-    return validDates.every((d) => widget.tempSelectedDates.contains(d));
+    final currentShifts = ref.read(shiftDateProvider);
+    return validDates.every((date) => currentShifts.any((s) =>
+        ShiftDateUtils.normalizeDate(s.date) == date &&
+        s.storeId == _selectedStoreId!));
   }
 
-  // 平日が全て選択されているかチェック
+  // 平日が全て選択されているかチェック（現在選択中の店舗のみ）
   bool _isWeekdaysFullySelected() {
+    if (_selectedStoreId == null) return false;
     final dates = _getDatesInMonth(_isWeekday);
     final today = ShiftDateUtils.normalizeDate(DateTime.now());
     final validDates = dates.where((d) => !d.isBefore(today)).toList();
     if (validDates.isEmpty) return false;
-    return validDates.every((d) => widget.tempSelectedDates.contains(d));
+    final currentShifts = ref.read(shiftDateProvider);
+    return validDates.every((date) => currentShifts.any((s) =>
+        ShiftDateUtils.normalizeDate(s.date) == date &&
+        s.storeId == _selectedStoreId!));
   }
 
-  // 土日祝が全て選択されているかチェック
+  // 土日祝が全て選択されているかチェック（現在選択中の店舗のみ）
   bool _isWeekendsAndHolidaysFullySelected() {
+    if (_selectedStoreId == null) return false;
     final dates = _getDatesInMonth(_isWeekendOrHoliday);
     final today = ShiftDateUtils.normalizeDate(DateTime.now());
     final validDates = dates.where((d) => !d.isBefore(today)).toList();
     if (validDates.isEmpty) return false;
-    return validDates.every((d) => widget.tempSelectedDates.contains(d));
+    final currentShifts = ref.read(shiftDateProvider);
+    return validDates.every((date) => currentShifts.any((s) =>
+        ShiftDateUtils.normalizeDate(s.date) == date &&
+        s.storeId == _selectedStoreId!));
   }
 
-  // 全日が選択されているかチェック
+  // 全日が選択されているかチェック（現在選択中の店舗のみ）
   bool _isAllDaysFullySelected() {
+    if (_selectedStoreId == null) return false;
     final dates = _getDatesInMonth((day) => true);
     final today = ShiftDateUtils.normalizeDate(DateTime.now());
     final validDates = dates.where((d) => !d.isBefore(today)).toList();
     if (validDates.isEmpty) return false;
-    return validDates.every((d) => widget.tempSelectedDates.contains(d));
+    final currentShifts = ref.read(shiftDateProvider);
+    return validDates.every((date) => currentShifts.any((s) =>
+        ShiftDateUtils.normalizeDate(s.date) == date &&
+        s.storeId == _selectedStoreId!));
   }
 
   // 第〇週の日付をトグル選択
@@ -947,13 +973,17 @@ class _DateSelectionPageState extends ConsumerState<_DateSelectionPage> {
     _toggleDatesWhere((day) => ShiftDateUtils.getWeekOfMonth(day) == week);
   }
 
-  // 第〇週が全て選択されているかチェック
+  // 第〇週が全て選択されているかチェック（現在選択中の店舗のみ）
   bool _isWeekOfMonthFullySelected(int week) {
+    if (_selectedStoreId == null) return false;
     final dates = _getDatesInMonth((day) => ShiftDateUtils.getWeekOfMonth(day) == week);
     final today = ShiftDateUtils.normalizeDate(DateTime.now());
     final validDates = dates.where((d) => !d.isBefore(today)).toList();
     if (validDates.isEmpty) return false;
-    return validDates.every((d) => widget.tempSelectedDates.contains(d));
+    final currentShifts = ref.read(shiftDateProvider);
+    return validDates.every((date) => currentShifts.any((s) =>
+        ShiftDateUtils.normalizeDate(s.date) == date &&
+        s.storeId == _selectedStoreId!));
   }
 
   // 第〇週が存在するかチェック（過去日を除く）
