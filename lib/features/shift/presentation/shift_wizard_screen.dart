@@ -3381,59 +3381,27 @@ class _TimeSettingListPageState extends ConsumerState<_TimeSettingListPage>
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 12),
                     child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Expanded(
-                          child: OutlinedButton.icon(
-                            onPressed:
-                                _hasWeekdays() ? _selectWeekdays : null,
-                            icon: const Icon(Icons.business_center, size: 16),
-                            label: const Text('平日',
-                                style: TextStyle(fontSize: 12)),
-                            style: OutlinedButton.styleFrom(
-                              padding: const EdgeInsets.symmetric(vertical: 8),
-                              backgroundColor: _isWeekdaysFullySelected()
-                                  ? Colors.green
-                                  : null,
-                              foregroundColor: _isWeekdaysFullySelected()
-                                  ? Colors.white
-                                  : null,
-                              side: BorderSide(
-                                color: !_hasWeekdays()
-                                    ? Colors.grey.shade300
-                                    : (_isWeekdaysFullySelected()
-                                        ? Colors.green
-                                        : Colors.grey),
-                              ),
-                            ),
+                          child: _buildWeekdayCategoryButton(
+                            icon: Icons.business_center,
+                            label: '平日',
+                            isFullySelected: _isWeekdaysFullySelected(),
+                            hasShifts: _hasWeekdays(),
+                            onPressed: _selectWeekdays,
+                            storesWithShifts: _getStoresWithShiftsForWeekdays(),
                           ),
                         ),
                         const SizedBox(width: 8),
                         Expanded(
-                          child: OutlinedButton.icon(
-                            onPressed: _hasWeekendsOrHolidays()
-                                ? _selectWeekendsAndHolidays
-                                : null,
-                            icon: const Icon(Icons.weekend, size: 16),
-                            label: const Text('土日祝',
-                                style: TextStyle(fontSize: 12)),
-                            style: OutlinedButton.styleFrom(
-                              padding: const EdgeInsets.symmetric(vertical: 8),
-                              backgroundColor:
-                                  _isWeekendsAndHolidaysFullySelected()
-                                      ? Colors.green
-                                      : null,
-                              foregroundColor:
-                                  _isWeekendsAndHolidaysFullySelected()
-                                      ? Colors.white
-                                      : null,
-                              side: BorderSide(
-                                color: !_hasWeekendsOrHolidays()
-                                    ? Colors.grey.shade300
-                                    : (_isWeekendsAndHolidaysFullySelected()
-                                        ? Colors.green
-                                        : Colors.grey),
-                              ),
-                            ),
+                          child: _buildWeekdayCategoryButton(
+                            icon: Icons.weekend,
+                            label: '土日祝',
+                            isFullySelected: _isWeekendsAndHolidaysFullySelected(),
+                            hasShifts: _hasWeekendsOrHolidays(),
+                            onPressed: _selectWeekendsAndHolidays,
+                            storesWithShifts: _getStoresWithShiftsForWeekendsAndHolidays(),
                           ),
                         ),
                       ],
@@ -3823,68 +3791,240 @@ class _TimeSettingListPageState extends ConsumerState<_TimeSettingListPage>
   Widget _buildWeekdayButton(String label, int weekday, Color color) {
     final isFullySelected = _isWeekdayFullySelected(weekday);
     final hasWeekday = _hasWeekday(weekday);
+    final storesWithShifts = _getStoresWithShiftsForWeekday(weekday);
 
     return Expanded(
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 2),
-        child: OutlinedButton(
-          onPressed: hasWeekday ? () => _selectByWeekday(weekday) : null,
-          style: OutlinedButton.styleFrom(
-            padding: const EdgeInsets.symmetric(vertical: 6),
-            side: BorderSide(
-              color: !hasWeekday
-                  ? Colors.grey.shade300
-                  : (isFullySelected ? Colors.green : color),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            OutlinedButton(
+              onPressed: hasWeekday ? () => _selectByWeekday(weekday) : null,
+              style: OutlinedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(vertical: 6),
+                side: BorderSide(
+                  color: !hasWeekday
+                      ? Colors.grey.shade300
+                      : (isFullySelected ? Colors.green : color),
+                ),
+                backgroundColor: isFullySelected ? Colors.green : null,
+                minimumSize: const Size(0, 0),
+              ),
+              child: Text(
+                label,
+                style: TextStyle(
+                  fontSize: 12,
+                  color: !hasWeekday
+                      ? Colors.grey.shade400
+                      : (isFullySelected ? Colors.white : color),
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
             ),
-            backgroundColor: isFullySelected ? Colors.green : null,
-            minimumSize: const Size(0, 0),
-          ),
-          child: Text(
-            label,
-            style: TextStyle(
-              fontSize: 12,
-              color: !hasWeekday
-                  ? Colors.grey.shade400
-                  : (isFullySelected ? Colors.white : color),
-              fontWeight: FontWeight.bold,
-            ),
-          ),
+            // 店舗ドット表示
+            if (storesWithShifts.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(top: 4),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: storesWithShifts.take(4).map((store) {
+                    final isWhite = store.color == Colors.white;
+                    return Container(
+                      width: 6,
+                      height: 6,
+                      margin: const EdgeInsets.symmetric(horizontal: 1),
+                      decoration: BoxDecoration(
+                        color: isWhite ? Colors.grey.shade400 : store.color,
+                        shape: BoxShape.circle,
+                        border: isWhite
+                            ? Border.all(color: Colors.grey.shade500, width: 0.5)
+                            : null,
+                      ),
+                    );
+                  }).toList(),
+                ),
+              ),
+          ],
         ),
       ),
     );
   }
 
+  // 指定曜日にシフトがある店舗リストを取得
+  List<Store> _getStoresWithShiftsForWeekday(int weekday) {
+    final shiftDates = ref.read(shiftDateProvider);
+    final stores = ref.read(storeProvider);
+    final storeIds = <String>{};
+
+    for (final shift in shiftDates) {
+      if (shift.date.weekday == weekday) {
+        storeIds.add(shift.storeId);
+      }
+    }
+
+    return stores.where((s) => storeIds.contains(s.id)).toList();
+  }
+
   Widget _buildWeekButton(String label, int week) {
     final isFullySelected = _isWeekOfMonthFullySelected(week);
     final hasWeek = _hasWeekOfMonth(week);
+    final storesWithShifts = _getStoresWithShiftsForWeek(week);
 
     return Expanded(
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 2),
-        child: OutlinedButton(
-          onPressed: hasWeek ? () => _selectByWeekOfMonth(week) : null,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            OutlinedButton(
+              onPressed: hasWeek ? () => _selectByWeekOfMonth(week) : null,
+              style: OutlinedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(vertical: 6),
+                side: BorderSide(
+                  color: !hasWeek
+                      ? Colors.grey.shade300
+                      : (isFullySelected ? Colors.green : Colors.grey),
+                ),
+                backgroundColor: isFullySelected ? Colors.green : null,
+                minimumSize: const Size(0, 0),
+              ),
+              child: Text(
+                label,
+                style: TextStyle(
+                  fontSize: 11,
+                  color: !hasWeek
+                      ? Colors.grey.shade400
+                      : (isFullySelected ? Colors.white : Colors.black),
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+            // 店舗ドット表示
+            if (storesWithShifts.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(top: 4),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: storesWithShifts.take(4).map((store) {
+                    final isWhite = store.color == Colors.white;
+                    return Container(
+                      width: 6,
+                      height: 6,
+                      margin: const EdgeInsets.symmetric(horizontal: 1),
+                      decoration: BoxDecoration(
+                        color: isWhite ? Colors.grey.shade400 : store.color,
+                        shape: BoxShape.circle,
+                        border: isWhite
+                            ? Border.all(color: Colors.grey.shade500, width: 0.5)
+                            : null,
+                      ),
+                    );
+                  }).toList(),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // 指定週にシフトがある店舗リストを取得
+  List<Store> _getStoresWithShiftsForWeek(int week) {
+    final shiftDates = ref.read(shiftDateProvider);
+    final stores = ref.read(storeProvider);
+    final storeIds = <String>{};
+
+    for (final shift in shiftDates) {
+      if (ShiftDateUtils.getWeekOfMonth(shift.date) == week) {
+        storeIds.add(shift.storeId);
+      }
+    }
+
+    return stores.where((s) => storeIds.contains(s.id)).toList();
+  }
+
+  // 平日にシフトがある店舗リストを取得
+  List<Store> _getStoresWithShiftsForWeekdays() {
+    final shiftDates = ref.read(shiftDateProvider);
+    final stores = ref.read(storeProvider);
+    final storeIds = <String>{};
+
+    for (final shift in shiftDates) {
+      if (_isWeekday(shift.date)) {
+        storeIds.add(shift.storeId);
+      }
+    }
+
+    return stores.where((s) => storeIds.contains(s.id)).toList();
+  }
+
+  // 土日祝にシフトがある店舗リストを取得
+  List<Store> _getStoresWithShiftsForWeekendsAndHolidays() {
+    final shiftDates = ref.read(shiftDateProvider);
+    final stores = ref.read(storeProvider);
+    final storeIds = <String>{};
+
+    for (final shift in shiftDates) {
+      if (_isWeekendOrHoliday(shift.date)) {
+        storeIds.add(shift.storeId);
+      }
+    }
+
+    return stores.where((s) => storeIds.contains(s.id)).toList();
+  }
+
+  // 平日/土日祝カテゴリボタンを構築
+  Widget _buildWeekdayCategoryButton({
+    required IconData icon,
+    required String label,
+    required bool isFullySelected,
+    required bool hasShifts,
+    required VoidCallback onPressed,
+    required List<Store> storesWithShifts,
+  }) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        OutlinedButton.icon(
+          onPressed: hasShifts ? onPressed : null,
+          icon: Icon(icon, size: 16),
+          label: Text(label, style: const TextStyle(fontSize: 12)),
           style: OutlinedButton.styleFrom(
-            padding: const EdgeInsets.symmetric(vertical: 6),
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            backgroundColor: isFullySelected ? Colors.green : null,
+            foregroundColor: isFullySelected ? Colors.white : null,
             side: BorderSide(
-              color: !hasWeek
+              color: !hasShifts
                   ? Colors.grey.shade300
                   : (isFullySelected ? Colors.green : Colors.grey),
             ),
-            backgroundColor: isFullySelected ? Colors.green : null,
-            minimumSize: const Size(0, 0),
-          ),
-          child: Text(
-            label,
-            style: TextStyle(
-              fontSize: 11,
-              color: !hasWeek
-                  ? Colors.grey.shade400
-                  : (isFullySelected ? Colors.white : Colors.black),
-              fontWeight: FontWeight.bold,
-            ),
           ),
         ),
-      ),
+        // 店舗ドット表示
+        if (storesWithShifts.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.only(top: 4),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: storesWithShifts.take(4).map((store) {
+                final isWhite = store.color == Colors.white;
+                return Container(
+                  width: 6,
+                  height: 6,
+                  margin: const EdgeInsets.symmetric(horizontal: 1),
+                  decoration: BoxDecoration(
+                    color: isWhite ? Colors.grey.shade400 : store.color,
+                    shape: BoxShape.circle,
+                    border: isWhite
+                        ? Border.all(color: Colors.grey.shade500, width: 0.5)
+                        : null,
+                  ),
+                );
+              }).toList(),
+            ),
+          ),
+      ],
     );
   }
 
