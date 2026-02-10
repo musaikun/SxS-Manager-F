@@ -29,7 +29,7 @@ class Store {
     return {
       'id': id,
       'name': name,
-      'color': color.value,
+      'color': color.toARGB32(),
     };
   }
 
@@ -50,14 +50,11 @@ class Store {
   int get hashCode => id.hashCode;
 }
 
-/// デフォルトの店舗色パレット
+/// デフォルトの店舗色パレット（掛け持ち機能用）
+/// 背景色（グレー）と被らない見やすい色を選択
 const List<Color> storeColorPalette = [
-  Color(0xFF5C6BC0), // インディゴ
-  Color(0xFFFF7043), // ディープオレンジ
-  Color(0xFF66BB6A), // グリーン
-  Color(0xFFEC407A), // ピンク
-  Color(0xFF42A5F5), // ブルー
-  Color(0xFFAB47BC), // パープル
-  Color(0xFF26A69A), // ティール
-  Color(0xFFFFCA28), // アンバー
+  Colors.white, // デフォルト店舗（本店）
+  Color(0xFF1976D2), // 掛け持ち先1（濃い青 - blue.shade700相当）
+  Color(0xFFFBC02D), // 掛け持ち先2（濃い黄色 - yellow.shade700相当）
+  Color(0xFFF57C00), // 掛け持ち先3（濃いオレンジ - orange.shade700相当）
 ];

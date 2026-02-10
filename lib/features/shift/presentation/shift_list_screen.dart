@@ -111,7 +111,7 @@ class ShiftListScreen extends ConsumerWidget {
     final daysWithoutTime = totalDays - daysWithTime;
 
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(12),
       color: Colors.grey[100],
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceAround,
@@ -151,7 +151,7 @@ class ShiftListScreen extends ConsumerWidget {
     List<ShiftDate> shiftDates,
   ) {
     return Padding(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(12),
       child: Row(
         children: [
           Expanded(
@@ -188,7 +188,7 @@ class ShiftListScreen extends ConsumerWidget {
     List<ShiftDate> shiftDates,
   ) {
     return ListView.builder(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
+      padding: const EdgeInsets.symmetric(horizontal: 12),
       itemCount: shiftDates.length,
       itemBuilder: (context, index) {
         final shiftDate = shiftDates[index];
@@ -212,7 +212,7 @@ class ShiftListScreen extends ConsumerWidget {
             },
             borderRadius: BorderRadius.circular(12),
             child: Padding(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.all(12),
               child: Row(
                 children: [
                   // 日付アイコン

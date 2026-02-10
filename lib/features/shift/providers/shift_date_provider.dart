@@ -29,8 +29,8 @@ class ShiftDateNotifier extends StateNotifier<List<ShiftDate>> {
         state = dates;
       }
     } catch (e) {
-      print('Failed to load shift dates: $e');
       // エラー時はデータをクリア
+      // デバッグ: Failed to load shift dates: $e
       final prefs = await SharedPreferences.getInstance();
       await prefs.remove(_storageKey);
     }
@@ -42,7 +42,7 @@ class ShiftDateNotifier extends StateNotifier<List<ShiftDate>> {
       final jsonList = state.map((date) => date.toJson()).toList();
       await prefs.setString(_storageKey, jsonEncode(jsonList));
     } catch (e) {
-      print('Failed to save shift dates: $e');
+      // デバッグ: Failed to save shift dates: $e
     }
   }
 
@@ -127,6 +127,38 @@ class ShiftDateNotifier extends StateNotifier<List<ShiftDate>> {
     state = state.map((d) {
       if (uniqueKeys.contains(d.uniqueKey)) {
         return d.copyWith(startTime: startTime, endTime: endTime);
+      }
+      return d;
+    }).toList();
+    _saveToStorage();
+  }
+
+  /// 複数の日付に同じ時間とメモを一括設定（uniqueKeyリストで指定）
+  void updateMultipleTimesAndMemo(
+    List<String> uniqueKeys,
+    String? startTime,
+    String? endTime,
+    String? memo,
+  ) {
+    state = state.map((d) {
+      if (uniqueKeys.contains(d.uniqueKey)) {
+        return d.copyWith(startTime: startTime, endTime: endTime, memo: memo);
+      }
+      return d;
+    }).toList();
+    _saveToStorage();
+  }
+
+  /// 単一の日付に時間とメモを設定（uniqueKeyで指定）
+  void updateTimeAndMemo(
+    String uniqueKey,
+    String? startTime,
+    String? endTime,
+    String? memo,
+  ) {
+    state = state.map((d) {
+      if (d.uniqueKey == uniqueKey) {
+        return d.copyWith(startTime: startTime, endTime: endTime, memo: memo);
       }
       return d;
     }).toList();
