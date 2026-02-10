@@ -3648,142 +3648,143 @@ class _TimeSettingListPageState extends ConsumerState<_TimeSettingListPage>
           ),
 
           // 展開時の問題リスト
-          AnimatedCrossFade(
-            firstChild: const SizedBox.shrink(),
-            secondChild: Container(
-              constraints: const BoxConstraints(maxHeight: 200),
-              child: ListView.builder(
-                shrinkWrap: true,
-                padding: const EdgeInsets.only(bottom: 8),
-                itemCount: issues.length,
-                itemBuilder: (context, index) {
-                  final issue = issues[index];
-                  final weekdays = ['月', '火', '水', '木', '金', '土', '日'];
-                  final weekday = weekdays[issue.date.weekday - 1];
-                  final isHoliday = JapaneseHolidays.isHoliday(issue.date);
+          ClipRect(
+            child: AnimatedAlign(
+              alignment: Alignment.topCenter,
+              duration: const Duration(milliseconds: 300),
+              curve: Curves.easeInOut,
+              heightFactor: _isIssuesPanelExpanded ? 1.0 : 0.0,
+              child: Container(
+                constraints: const BoxConstraints(maxHeight: 200),
+                child: ListView.builder(
+                  shrinkWrap: true,
+                  padding: const EdgeInsets.only(bottom: 8),
+                  itemCount: issues.length,
+                  itemBuilder: (context, index) {
+                    final issue = issues[index];
+                    final weekdays = ['月', '火', '水', '木', '金', '土', '日'];
+                    final weekday = weekdays[issue.date.weekday - 1];
+                    final isHoliday = JapaneseHolidays.isHoliday(issue.date);
 
-                  Color dateColor = Colors.black87;
-                  if (isHoliday || issue.date.weekday == DateTime.sunday) {
-                    dateColor = Colors.red;
-                  } else if (issue.date.weekday == DateTime.saturday) {
-                    dateColor = Colors.blue;
-                  }
+                    Color dateColor = Colors.black87;
+                    if (isHoliday || issue.date.weekday == DateTime.sunday) {
+                      dateColor = Colors.red;
+                    } else if (issue.date.weekday == DateTime.saturday) {
+                      dateColor = Colors.blue;
+                    }
 
-                  return InkWell(
-                    onTap: () => _scrollToCard(issue.dateIndex),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                      child: Row(
-                        children: [
-                          // 問題タイプアイコン
-                          Container(
-                            width: 28,
-                            height: 28,
-                            decoration: BoxDecoration(
-                              color: issue.type == _IssueType.unsetTime
-                                  ? Colors.orange.shade100
-                                  : Colors.red.shade100,
-                              shape: BoxShape.circle,
+                    return InkWell(
+                      onTap: () => _scrollToCard(issue.dateIndex),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                        child: Row(
+                          children: [
+                            // 問題タイプアイコン
+                            Container(
+                              width: 28,
+                              height: 28,
+                              decoration: BoxDecoration(
+                                color: issue.type == _IssueType.unsetTime
+                                    ? Colors.orange.shade100
+                                    : Colors.red.shade100,
+                                shape: BoxShape.circle,
+                              ),
+                              child: Icon(
+                                issue.type == _IssueType.unsetTime
+                                    ? Icons.schedule
+                                    : Icons.layers,
+                                size: 16,
+                                color: issue.type == _IssueType.unsetTime
+                                    ? Colors.orange.shade800
+                                    : Colors.red.shade800,
+                              ),
                             ),
-                            child: Icon(
-                              issue.type == _IssueType.unsetTime
-                                  ? Icons.schedule
-                                  : Icons.layers,
-                              size: 16,
-                              color: issue.type == _IssueType.unsetTime
-                                  ? Colors.orange.shade800
-                                  : Colors.red.shade800,
+                            const SizedBox(width: 12),
+                            // 日付
+                            Text(
+                              '${issue.date.month}/${issue.date.day}',
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                color: dateColor,
+                                fontSize: 14,
+                              ),
                             ),
-                          ),
-                          const SizedBox(width: 12),
-                          // 日付
-                          Text(
-                            '${issue.date.month}/${issue.date.day}',
-                            style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              color: dateColor,
-                              fontSize: 14,
+                            Text(
+                              '($weekday)',
+                              style: TextStyle(
+                                color: dateColor,
+                                fontSize: 12,
+                              ),
                             ),
-                          ),
-                          Text(
-                            '($weekday)',
-                            style: TextStyle(
-                              color: dateColor,
-                              fontSize: 12,
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          // 詳細
-                          Expanded(
-                            child: issue.type == _IssueType.unsetTime
-                                ? Row(
-                                    children: [
-                                      Container(
-                                        width: 10,
-                                        height: 10,
-                                        decoration: BoxDecoration(
-                                          color: issue.storeColor,
-                                          shape: BoxShape.circle,
-                                          border: Border.all(
-                                            color: issue.storeColor == Colors.white
-                                                ? Colors.grey
-                                                : Colors.transparent,
+                            const SizedBox(width: 12),
+                            // 詳細
+                            Expanded(
+                              child: issue.type == _IssueType.unsetTime
+                                  ? Row(
+                                      children: [
+                                        Container(
+                                          width: 10,
+                                          height: 10,
+                                          decoration: BoxDecoration(
+                                            color: issue.storeColor,
+                                            shape: BoxShape.circle,
+                                            border: Border.all(
+                                              color: issue.storeColor == Colors.white
+                                                  ? Colors.grey
+                                                  : Colors.transparent,
+                                            ),
                                           ),
                                         ),
-                                      ),
-                                      const SizedBox(width: 6),
-                                      Expanded(
-                                        child: Text(
-                                          '${issue.storeName} - 時間未設定',
-                                          style: TextStyle(
-                                            fontSize: 13,
-                                            color: Colors.grey.shade700,
+                                        const SizedBox(width: 6),
+                                        Expanded(
+                                          child: Text(
+                                            '${issue.storeName} - 時間未設定',
+                                            style: TextStyle(
+                                              fontSize: 13,
+                                              color: Colors.grey.shade700,
+                                            ),
+                                            overflow: TextOverflow.ellipsis,
                                           ),
-                                          overflow: TextOverflow.ellipsis,
                                         ),
-                                      ),
-                                    ],
-                                  )
-                                : Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        '時間重複',
-                                        style: TextStyle(
-                                          fontSize: 12,
-                                          color: Colors.red.shade700,
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                      ),
-                                      if (issue.overlapInfo != null)
+                                      ],
+                                    )
+                                  : Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
                                         Text(
-                                          '${issue.overlapInfo!.store1Name} ${issue.overlapInfo!.store1Time} / ${issue.overlapInfo!.store2Name} ${issue.overlapInfo!.store2Time}',
+                                          '時間重複',
                                           style: TextStyle(
-                                            fontSize: 11,
-                                            color: Colors.grey.shade600,
+                                            fontSize: 12,
+                                            color: Colors.red.shade700,
+                                            fontWeight: FontWeight.bold,
                                           ),
-                                          overflow: TextOverflow.ellipsis,
                                         ),
-                                    ],
-                                  ),
-                          ),
-                          // 矢印アイコン
-                          Icon(
-                            Icons.chevron_right,
-                            color: Colors.grey.shade400,
-                            size: 20,
-                          ),
-                        ],
+                                        if (issue.overlapInfo != null)
+                                          Text(
+                                            '${issue.overlapInfo!.store1Name} ${issue.overlapInfo!.store1Time} / ${issue.overlapInfo!.store2Name} ${issue.overlapInfo!.store2Time}',
+                                            style: TextStyle(
+                                              fontSize: 11,
+                                              color: Colors.grey.shade600,
+                                            ),
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                      ],
+                                    ),
+                            ),
+                            // 矢印アイコン
+                            Icon(
+                              Icons.chevron_right,
+                              color: Colors.grey.shade400,
+                              size: 20,
+                            ),
+                          ],
+                        ),
                       ),
-                    ),
-                  );
-                },
+                    );
+                  },
+                ),
               ),
             ),
-            crossFadeState: _isIssuesPanelExpanded
-                ? CrossFadeState.showSecond
-                : CrossFadeState.showFirst,
-            duration: const Duration(milliseconds: 300),
           ),
         ],
       ),
