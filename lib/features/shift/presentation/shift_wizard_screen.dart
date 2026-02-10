@@ -635,18 +635,12 @@ class _DateSelectionPageState extends ConsumerState<_DateSelectionPage> {
     setState(() {
       final currentShifts = ref.read(shiftDateProvider);
 
-      // 選択された日付に対応するすべてのシフトデータを削除
-      for (final date in widget.tempSelectedDates.toList()) {
-        // この日付のすべてのシフトを削除
-        final shiftsToRemove = currentShifts.where(
-          (s) => ShiftDateUtils.normalizeDate(s.date) == date,
-        ).toList();
-
-        for (final shift in shiftsToRemove) {
-          ref.read(shiftDateProvider.notifier).removeDate(shift.uniqueKey);
-        }
+      // shiftDateProviderの全てのシフトを削除
+      for (final shift in currentShifts.toList()) {
+        ref.read(shiftDateProvider.notifier).removeDate(shift.uniqueKey);
       }
 
+      // tempSelectedDatesもクリア
       widget.tempSelectedDates.clear();
     });
 
@@ -664,31 +658,23 @@ class _DateSelectionPageState extends ConsumerState<_DateSelectionPage> {
         orElse: () => ref.read(storeProvider).first,
       ).name;
 
-      int removedCount = 0;
+      // shiftDateProviderから指定店舗のシフトを削除
+      final shiftsToRemove = currentShifts.where((s) => s.storeId == storeId).toList();
+      for (final shift in shiftsToRemove) {
+        ref.read(shiftDateProvider.notifier).removeDate(shift.uniqueKey);
 
-      // 選択された日付に対応する指定店舗のシフトデータを削除
-      for (final date in widget.tempSelectedDates.toList()) {
-        try {
-          final targetShift = currentShifts.firstWhere(
-            (s) => ShiftDateUtils.normalizeDate(s.date) == date && s.storeId == storeId,
-          );
-          ref.read(shiftDateProvider.notifier).removeDate(targetShift.uniqueKey);
-          removedCount++;
-
-          // この日付に他の店舗のシフトがなければ、tempSelectedDatesからも削除
-          final remainingShifts = ref.read(shiftDateProvider).where(
-            (s) => ShiftDateUtils.normalizeDate(s.date) == date,
-          );
-          if (remainingShifts.isEmpty) {
-            widget.tempSelectedDates.remove(date);
-          }
-        } catch (e) {
-          // シフトが見つからない場合は何もしない
+        // この日付に他の店舗のシフトがなければ、tempSelectedDatesからも削除
+        final normalized = ShiftDateUtils.normalizeDate(shift.date);
+        final remainingShifts = ref.read(shiftDateProvider).where(
+          (s) => ShiftDateUtils.normalizeDate(s.date) == normalized,
+        );
+        if (remainingShifts.isEmpty) {
+          widget.tempSelectedDates.remove(normalized);
         }
       }
 
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('$storeNameの$removedCount件をクリアしました')),
+        SnackBar(content: Text('$storeNameの${shiftsToRemove.length}件をクリアしました')),
       );
     });
   }
@@ -699,20 +685,15 @@ class _DateSelectionPageState extends ConsumerState<_DateSelectionPage> {
       final currentShifts = ref.read(shiftDateProvider);
       int clearedCount = 0;
 
-      // 選択された日付のすべてのシフトの時間をクリア
-      for (final date in widget.tempSelectedDates) {
-        final shiftsToUpdate = currentShifts.where(
-          (s) => ShiftDateUtils.normalizeDate(s.date) == date && s.hasTime,
-        ).toList();
-
-        for (final shift in shiftsToUpdate) {
-          ref.read(shiftDateProvider.notifier).updateTime(
-            shift.uniqueKey,
-            null,
-            null,
-          );
-          clearedCount++;
-        }
+      // shiftDateProviderの全てのシフトの時間をクリア
+      final shiftsWithTime = currentShifts.where((s) => s.hasTime).toList();
+      for (final shift in shiftsWithTime) {
+        ref.read(shiftDateProvider.notifier).updateTime(
+          shift.uniqueKey,
+          null,
+          null,
+        );
+        clearedCount++;
       }
 
       ScaffoldMessenger.of(context).showSnackBar(
@@ -2539,6 +2520,33 @@ class _TimeSettingListPageState extends ConsumerState<_TimeSettingListPage>
                         },
                       ),
                     ),
+                  // 時間重複の警告
+                  if (_hasTimeOverlap(shiftsOnDate.cast<ShiftDate>()))
+                    Padding(
+                      padding: const EdgeInsets.only(top: 8),
+                      child: AnimatedBuilder(
+                        animation: _blinkAnimation,
+                        builder: (context, child) {
+                          return Opacity(
+                            opacity: _blinkAnimation.value,
+                            child: Row(
+                              children: [
+                                const Icon(Icons.schedule, color: Colors.red, size: 16),
+                                const SizedBox(width: 4),
+                                Text(
+                                  '勤務時間が重複しています',
+                                  style: TextStyle(
+                                    color: Colors.red.shade800,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          );
+                        },
+                      ),
+                    ),
                 ],
               ),
             ),
@@ -2548,13 +2556,48 @@ class _TimeSettingListPageState extends ConsumerState<_TimeSettingListPage>
     );
   }
 
-  // 大きなタイムラインバーを構築（Page 2用）
+  // 時間重複をチェック
+  bool _hasTimeOverlap(List<ShiftDate> shifts) {
+    final shiftsWithTime = shifts.where((s) => s.hasTime).toList();
+    if (shiftsWithTime.length < 2) return false;
+
+    for (int i = 0; i < shiftsWithTime.length; i++) {
+      for (int j = i + 1; j < shiftsWithTime.length; j++) {
+        final shift1 = shiftsWithTime[i];
+        final shift2 = shiftsWithTime[j];
+
+        final start1Parts = shift1.startTime!.split(':');
+        final end1Parts = shift1.endTime!.split(':');
+        final start2Parts = shift2.startTime!.split(':');
+        final end2Parts = shift2.endTime!.split(':');
+
+        double start1 = int.parse(start1Parts[0]) + int.parse(start1Parts[1]) / 60.0;
+        double end1 = int.parse(end1Parts[0]) + int.parse(end1Parts[1]) / 60.0;
+        double start2 = int.parse(start2Parts[0]) + int.parse(start2Parts[1]) / 60.0;
+        double end2 = int.parse(end2Parts[0]) + int.parse(end2Parts[1]) / 60.0;
+
+        if (end1 <= start1) end1 = 24.0;
+        if (end2 <= start2) end2 = 24.0;
+
+        // 重複チェック
+        if (start1 < end2 && start2 < end1) {
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+
+  // 大きなタイムラインバーを構築（Page 2用・レーン分割対応）
   Widget _buildLargeTimelineBar(List<ShiftDate> shifts, List<Store> stores) {
     final shiftsWithTime = shifts.where((s) => s.hasTime).toList();
+    final laneCount = shiftsWithTime.isEmpty ? 1 : shiftsWithTime.length;
+    // レーン数に応じて高さを調整（1レーン: 32px、最大4レーンまで）
+    final barHeight = (24.0 * laneCount.clamp(1, 4)).toDouble();
 
     return Container(
       width: double.infinity,
-      height: 32,
+      height: barHeight,
       decoration: BoxDecoration(
         color: Colors.grey.shade200,
         borderRadius: BorderRadius.circular(6),
@@ -2565,19 +2608,22 @@ class _TimeSettingListPageState extends ConsumerState<_TimeSettingListPage>
           children: [
             // 時間目盛り（背景）
             CustomPaint(
-              size: const Size(double.infinity, 32),
+              size: Size(double.infinity, barHeight),
               painter: _TimelineScalePainter(),
             ),
-            // シフトバー
+            // シフトバー（レーン分割）
             CustomPaint(
-              size: const Size(double.infinity, 32),
+              size: Size(double.infinity, barHeight),
               painter: _LargeTimelineBarPainter(
                 shifts: shiftsWithTime,
                 stores: stores,
+                laneCount: laneCount,
               ),
             ),
-            // 店舗ラベル（バー内に表示）
-            ...shiftsWithTime.map((shift) {
+            // 店舗ラベル（レーンごとに表示）
+            ...shiftsWithTime.asMap().entries.map((entry) {
+              final index = entry.key;
+              final shift = entry.value;
               final store = stores.firstWhere(
                 (s) => s.id == shift.storeId,
                 orElse: () => stores.first,
@@ -2593,11 +2639,15 @@ class _TimeSettingListPageState extends ConsumerState<_TimeSettingListPage>
               final endPercent = endHour / 24.0;
               final widthPercent = endPercent - startPercent;
 
+              // レーンの位置を計算
+              final laneHeight = barHeight / laneCount;
+              final laneTop = index * laneHeight;
+
               return Positioned(
                 left: startPercent * (MediaQuery.of(context).size.width - 48), // カードのパディングを考慮
                 width: widthPercent * (MediaQuery.of(context).size.width - 48),
-                top: 0,
-                bottom: 0,
+                top: laneTop,
+                height: laneHeight,
                 child: Center(
                   child: Text(
                     store.name.length > 6 ? '${store.name.substring(0, 6)}...' : store.name,
@@ -4246,46 +4296,28 @@ class _TimelineScalePainter extends CustomPainter {
   bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
 
-/// 大きなタイムラインバーを描画するPainter（Page 2用）
+/// 大きなタイムラインバーを描画するPainter（Page 2用・レーン分割）
 class _LargeTimelineBarPainter extends CustomPainter {
   final List<ShiftDate> shifts;
   final List<Store> stores;
+  final int laneCount;
 
   _LargeTimelineBarPainter({
     required this.shifts,
     required this.stores,
+    required this.laneCount,
   });
 
   @override
   void paint(Canvas canvas, Size size) {
-    // 時間範囲を計算（重複検出用）
-    final List<_TimeRange> timeRanges = [];
+    if (shifts.isEmpty || laneCount == 0) return;
 
-    for (final shift in shifts) {
-      if (!shift.hasTime) continue;
+    final laneHeight = size.height / laneCount;
+    final padding = 2.0;
 
-      final startParts = shift.startTime!.split(':');
-      final endParts = shift.endTime!.split(':');
-      final startHour = int.parse(startParts[0]);
-      final startMinute = int.parse(startParts[1]);
-      final endHour = int.parse(endParts[0]);
-      final endMinute = int.parse(endParts[1]);
-
-      double startTime = startHour + startMinute / 60.0;
-      double endTime = endHour + endMinute / 60.0;
-
-      if (endTime <= startTime) {
-        endTime = 24.0;
-      }
-
-      timeRanges.add(_TimeRange(startTime, endTime, shift.storeId));
-    }
-
-    // 重複している時間帯を検出
-    final List<_TimeRange> overlaps = _detectOverlaps(timeRanges);
-
-    // 各シフトのバーを描画
-    for (final shift in shifts) {
+    // 各シフトをレーンごとに描画
+    for (int i = 0; i < shifts.length; i++) {
+      final shift = shifts[i];
       if (!shift.hasTime) continue;
 
       final startParts = shift.startTime!.split(':');
@@ -4312,8 +4344,12 @@ class _LargeTimelineBarPainter extends CustomPainter {
       final startX = (startTime / 24.0) * size.width;
       final endX = (endTime / 24.0) * size.width;
 
+      // レーンの位置を計算
+      final laneTop = i * laneHeight + padding;
+      final laneBottom = (i + 1) * laneHeight - padding;
+
       final rect = RRect.fromRectAndRadius(
-        Rect.fromLTRB(startX, 2, endX, size.height - 2),
+        Rect.fromLTRB(startX, laneTop, endX, laneBottom),
         const Radius.circular(4),
       );
 
@@ -4332,6 +4368,7 @@ class _LargeTimelineBarPainter extends CustomPainter {
     }
 
     // 重複部分を赤枠で表示
+    final overlaps = _detectOverlaps();
     for (final overlap in overlaps) {
       final startX = (overlap.start / 24.0) * size.width;
       final endX = (overlap.end / 24.0) * size.width;
@@ -4347,25 +4384,34 @@ class _LargeTimelineBarPainter extends CustomPainter {
         ..strokeWidth = 2
         ..style = PaintingStyle.stroke;
       canvas.drawRRect(overlapRect, overlapBorderPaint);
-
-      // 薄い赤背景
-      final overlapFillPaint = Paint()
-        ..color = Colors.red.withValues(alpha: 0.1)
-        ..style = PaintingStyle.fill;
-      canvas.drawRRect(overlapRect, overlapFillPaint);
     }
   }
 
   // 重複している時間帯を検出
-  List<_TimeRange> _detectOverlaps(List<_TimeRange> ranges) {
+  List<_TimeRange> _detectOverlaps() {
+    final List<_TimeRange> timeRanges = [];
     final List<_TimeRange> overlaps = [];
 
-    for (int i = 0; i < ranges.length; i++) {
-      for (int j = i + 1; j < ranges.length; j++) {
-        final a = ranges[i];
-        final b = ranges[j];
+    for (final shift in shifts) {
+      if (!shift.hasTime) continue;
 
-        // 重複チェック
+      final startParts = shift.startTime!.split(':');
+      final endParts = shift.endTime!.split(':');
+      double startTime = int.parse(startParts[0]) + int.parse(startParts[1]) / 60.0;
+      double endTime = int.parse(endParts[0]) + int.parse(endParts[1]) / 60.0;
+
+      if (endTime <= startTime) {
+        endTime = 24.0;
+      }
+
+      timeRanges.add(_TimeRange(startTime, endTime, shift.storeId));
+    }
+
+    for (int i = 0; i < timeRanges.length; i++) {
+      for (int j = i + 1; j < timeRanges.length; j++) {
+        final a = timeRanges[i];
+        final b = timeRanges[j];
+
         if (a.start < b.end && b.start < a.end) {
           final overlapStart = a.start > b.start ? a.start : b.start;
           final overlapEnd = a.end < b.end ? a.end : b.end;
