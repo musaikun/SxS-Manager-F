@@ -4437,6 +4437,3 @@ class _TimeRange {
 
   _TimeRange(this.start, this.end, this.storeId);
 }
-    return shifts != oldDelegate.shifts || stores != oldDelegate.stores;
-  }
-}
