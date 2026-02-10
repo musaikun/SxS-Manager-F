@@ -1575,15 +1575,15 @@ class _DateSelectionPageState extends ConsumerState<_DateSelectionPage> {
                     OutlinedButton(
                       onPressed: () => _toggleWeekday(weekday),
                       style: OutlinedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 6),
-                        side: BorderSide(color: isFullySelected ? Colors.green : colors[index]),
+                        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
+                        side: BorderSide(color: isFullySelected ? Colors.green : colors[index], width: 1.5),
                         backgroundColor: isFullySelected ? Colors.green : null,
-                        minimumSize: const Size(0, 0),
+                        minimumSize: const Size(0, 36),
                       ),
                       child: Text(
                         weekdays[index],
                         style: TextStyle(
-                          fontSize: 12,
+                          fontSize: 14,
                           color: isFullySelected ? Colors.white : colors[index],
                           fontWeight: FontWeight.bold,
                         ),
@@ -1643,19 +1643,20 @@ class _DateSelectionPageState extends ConsumerState<_DateSelectionPage> {
                     OutlinedButton(
                       onPressed: hasWeek ? () => _toggleWeekOfMonth(week) : null,
                       style: OutlinedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 6),
+                        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
                         side: BorderSide(
                           color: !hasWeek
                               ? Colors.grey.shade300
                               : (isFullySelected ? Colors.green : Colors.grey),
+                          width: 1.5,
                         ),
                         backgroundColor: isFullySelected ? Colors.green : null,
-                        minimumSize: const Size(0, 0),
+                        minimumSize: const Size(0, 36),
                       ),
                       child: Text(
                         '第$week週',
                         style: TextStyle(
-                          fontSize: 11,
+                          fontSize: 12,
                           color: !hasWeek
                               ? Colors.grey.shade400
                               : (isFullySelected ? Colors.white : Colors.black),
