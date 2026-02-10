@@ -398,17 +398,18 @@ class _DateSelectionPageState extends ConsumerState<_DateSelectionPage> {
 
       if (validDates.isEmpty) return;
 
-      // 全部選択済みか確認
-      final allSelected =
-          validDates.every((d) => widget.tempSelectedDates.contains(d));
+      final currentShifts = ref.read(shiftDateProvider);
 
-      if (allSelected) {
-        // 解除：日付を削除し、時間も削除
-        validDates.forEach(widget.tempSelectedDates.remove);
+      // 現在選択中の店舗で、対象日付にシフトが登録されているかで判定
+      final allSelectedForCurrentStore = validDates.every((date) {
+        return currentShifts.any((s) =>
+            ShiftDateUtils.normalizeDate(s.date) == date &&
+            s.storeId == _selectedStoreId!);
+      });
 
-        final currentShifts = ref.read(shiftDateProvider);
-
-        // 該当するシフトを削除（選択中の店舗のみ）
+      if (allSelectedForCurrentStore) {
+        // 解除：現在の店舗のシフトを削除
+        // tempSelectedDatesからは削除しない（他の店舗で選択中かもしれないため）
         for (final date in validDates) {
           try {
             final targetShift = currentShifts.firstWhere(
@@ -422,8 +423,6 @@ class _DateSelectionPageState extends ConsumerState<_DateSelectionPage> {
       } else {
         // 選択
         widget.tempSelectedDates.addAll(validDates);
-
-        final currentShifts = ref.read(shiftDateProvider);
 
         // 新しく追加された日付のみ処理（プリセットの有無に関わらず）
         final newDates = validDates.where((date) {
@@ -1528,35 +1527,67 @@ class _DateSelectionPageState extends ConsumerState<_DateSelectionPage> {
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-      child: Row(
-        children: List.generate(7, (index) {
-          // DateTime.sunday=7, Monday=1なので、日曜は7、月〜土は1〜6
-          final weekday = index == 0 ? DateTime.sunday : index;
-          final isFullySelected = _isWeekdayFullySelected(weekday);
+      child: IntrinsicHeight(
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: List.generate(7, (index) {
+            // DateTime.sunday=7, Monday=1なので、日曜は7、月〜土は1〜6
+            final weekday = index == 0 ? DateTime.sunday : index;
+            final isFullySelected = _isWeekdayFullySelected(weekday);
+            final storesWithShifts = _getStoresWithShiftsForWeekday(weekday);
 
-          return Expanded(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 2),
-              child: OutlinedButton(
-                onPressed: () => _toggleWeekday(weekday),
-                style: OutlinedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 6),
-                  side: BorderSide(color: isFullySelected ? Colors.green : colors[index]),
-                  backgroundColor: isFullySelected ? Colors.green : null,
-                  minimumSize: const Size(0, 0),
-                ),
-                child: Text(
-                  weekdays[index],
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: isFullySelected ? Colors.white : colors[index],
-                    fontWeight: FontWeight.bold,
-                  ),
+            return Expanded(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 2),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    OutlinedButton(
+                      onPressed: () => _toggleWeekday(weekday),
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 6),
+                        side: BorderSide(color: isFullySelected ? Colors.green : colors[index]),
+                        backgroundColor: isFullySelected ? Colors.green : null,
+                        minimumSize: const Size(0, 0),
+                      ),
+                      child: Text(
+                        weekdays[index],
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: isFullySelected ? Colors.white : colors[index],
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                    // 店舗ドット表示
+                    if (storesWithShifts.isNotEmpty)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 4),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: storesWithShifts.take(4).map((store) {
+                            final isWhite = store.color == Colors.white;
+                            return Container(
+                              width: 6,
+                              height: 6,
+                              margin: const EdgeInsets.symmetric(horizontal: 1),
+                              decoration: BoxDecoration(
+                                color: isWhite ? Colors.grey.shade400 : store.color,
+                                shape: BoxShape.circle,
+                                border: isWhite
+                                    ? Border.all(color: Colors.grey.shade500, width: 0.5)
+                                    : null,
+                              ),
+                            );
+                          }).toList(),
+                        ),
+                      ),
+                  ],
                 ),
               ),
-            ),
-          );
-        }),
+            );
+          }),
+        ),
       ),
     );
   }
@@ -1564,43 +1595,92 @@ class _DateSelectionPageState extends ConsumerState<_DateSelectionPage> {
   Widget _buildWeekButtons() {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      child: Row(
-        children: List.generate(5, (index) {
-          final week = index + 1; // 第1週〜第5週
-          final isFullySelected = _isWeekOfMonthFullySelected(week);
-          final hasWeek = _hasWeekOfMonth(week);
+      child: IntrinsicHeight(
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: List.generate(5, (index) {
+            final week = index + 1; // 第1週〜第5週
+            final isFullySelected = _isWeekOfMonthFullySelected(week);
+            final hasWeek = _hasWeekOfMonth(week);
+            final storesWithShifts = _getStoresWithShiftsForWeek(week);
 
-          return Expanded(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 2),
-              child: OutlinedButton(
-                onPressed: hasWeek ? () => _toggleWeekOfMonth(week) : null,
-                style: OutlinedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 6),
-                  side: BorderSide(
-                    color: !hasWeek
-                        ? Colors.grey.shade300
-                        : (isFullySelected ? Colors.green : Colors.grey),
-                  ),
-                  backgroundColor: isFullySelected ? Colors.green : null,
-                  minimumSize: const Size(0, 0),
-                ),
-                child: Text(
-                  '第$week週',
-                  style: TextStyle(
-                    fontSize: 11,
-                    color: !hasWeek
-                        ? Colors.grey.shade400
-                        : (isFullySelected ? Colors.white : Colors.black),
-                    fontWeight: FontWeight.bold,
-                  ),
+            return Expanded(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 2),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    OutlinedButton(
+                      onPressed: hasWeek ? () => _toggleWeekOfMonth(week) : null,
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 6),
+                        side: BorderSide(
+                          color: !hasWeek
+                              ? Colors.grey.shade300
+                              : (isFullySelected ? Colors.green : Colors.grey),
+                        ),
+                        backgroundColor: isFullySelected ? Colors.green : null,
+                        minimumSize: const Size(0, 0),
+                      ),
+                      child: Text(
+                        '第$week週',
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: !hasWeek
+                              ? Colors.grey.shade400
+                              : (isFullySelected ? Colors.white : Colors.black),
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                    // 店舗ドット表示
+                    if (storesWithShifts.isNotEmpty)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 4),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: storesWithShifts.take(4).map((store) {
+                            final isWhite = store.color == Colors.white;
+                            return Container(
+                              width: 6,
+                              height: 6,
+                              margin: const EdgeInsets.symmetric(horizontal: 1),
+                              decoration: BoxDecoration(
+                                color: isWhite ? Colors.grey.shade400 : store.color,
+                                shape: BoxShape.circle,
+                                border: isWhite
+                                    ? Border.all(color: Colors.grey.shade500, width: 0.5)
+                                    : null,
+                              ),
+                            );
+                          }).toList(),
+                        ),
+                      ),
+                  ],
                 ),
               ),
-            ),
-          );
-        }),
+            );
+          }),
+        ),
       ),
     );
+  }
+
+  // 指定週にシフトがある店舗リストを取得
+  List<Store> _getStoresWithShiftsForWeek(int week) {
+    final shiftDates = ref.read(shiftDateProvider);
+    final stores = ref.read(storeProvider);
+    final storeIds = <String>{};
+
+    for (final shift in shiftDates) {
+      if (shift.date.month == _currentMonth.month &&
+          shift.date.year == _currentMonth.year &&
+          _getWeekOfMonth(shift.date) == week) {
+        storeIds.add(shift.storeId);
+      }
+    }
+
+    return stores.where((s) => storeIds.contains(s.id)).toList();
   }
 
   // 店舗セレクター
