@@ -3441,16 +3441,19 @@ class _TimeSettingListPageState extends ConsumerState<_TimeSettingListPage>
                           ),
                         ),
                         const SizedBox(height: 8),
-                        Row(
-                          children: [
-                            _buildWeekdayButton('日', DateTime.sunday, Colors.red),
-                            _buildWeekdayButton('月', DateTime.monday, Colors.grey),
-                            _buildWeekdayButton('火', DateTime.tuesday, Colors.grey),
-                            _buildWeekdayButton('水', DateTime.wednesday, Colors.grey),
-                            _buildWeekdayButton('木', DateTime.thursday, Colors.grey),
-                            _buildWeekdayButton('金', DateTime.friday, Colors.grey),
-                            _buildWeekdayButton('土', DateTime.saturday, Colors.blue),
-                          ],
+                        IntrinsicHeight(
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              _buildWeekdayButton('日', DateTime.sunday, Colors.red),
+                              _buildWeekdayButton('月', DateTime.monday, Colors.grey),
+                              _buildWeekdayButton('火', DateTime.tuesday, Colors.grey),
+                              _buildWeekdayButton('水', DateTime.wednesday, Colors.grey),
+                              _buildWeekdayButton('木', DateTime.thursday, Colors.grey),
+                              _buildWeekdayButton('金', DateTime.friday, Colors.grey),
+                              _buildWeekdayButton('土', DateTime.saturday, Colors.blue),
+                            ],
+                          ),
                         ),
                       ],
                     ),
@@ -3506,14 +3509,17 @@ class _TimeSettingListPageState extends ConsumerState<_TimeSettingListPage>
                           ),
                         ),
                         const SizedBox(height: 8),
-                        Row(
-                          children: [
-                            _buildWeekButton('第1週', 1),
-                            _buildWeekButton('第2週', 2),
-                            _buildWeekButton('第3週', 3),
-                            _buildWeekButton('第4週', 4),
-                            _buildWeekButton('第5週', 5),
-                          ],
+                        IntrinsicHeight(
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              _buildWeekButton('第1週', 1),
+                              _buildWeekButton('第2週', 2),
+                              _buildWeekButton('第3週', 3),
+                              _buildWeekButton('第4週', 4),
+                              _buildWeekButton('第5週', 5),
+                            ],
+                          ),
                         ),
                       ],
                     ),
