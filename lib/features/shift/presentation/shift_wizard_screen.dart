@@ -2068,6 +2068,8 @@ class _TimeSettingListPageState extends ConsumerState<_TimeSettingListPage>
   late Animation<double> _blinkAnimation;
   late AnimationController _accordionController;
   late Animation<double> _accordionRotation;
+  final ScrollController _scrollController = ScrollController();
+  bool _isIssuesPanelExpanded = false; // 問題パネルの開閉状態
 
   @override
   void initState() {
@@ -2100,7 +2102,117 @@ class _TimeSettingListPageState extends ConsumerState<_TimeSettingListPage>
   void dispose() {
     _blinkController.dispose();
     _accordionController.dispose();
+    _scrollController.dispose();
     super.dispose();
+  }
+
+  // 問題を検出するメソッド
+  List<_ShiftIssue> _detectIssues(List<dynamic> shiftDates, List<Store> stores) {
+    final List<_ShiftIssue> issues = [];
+
+    // 日付ごとにグループ化
+    final Map<DateTime, List<dynamic>> dateGroups = {};
+    for (final shift in shiftDates) {
+      final normalized = ShiftDateUtils.normalizeDate(shift.date);
+      dateGroups.putIfAbsent(normalized, () => []);
+      dateGroups[normalized]!.add(shift);
+    }
+
+    // 日付でソート
+    final sortedDates = dateGroups.keys.toList()..sort();
+
+    for (int dateIndex = 0; dateIndex < sortedDates.length; dateIndex++) {
+      final date = sortedDates[dateIndex];
+      final shiftsOnDate = dateGroups[date]!;
+
+      // 時間未設定をチェック
+      for (final shift in shiftsOnDate) {
+        if (!shift.hasTime) {
+          final store = stores.firstWhere(
+            (s) => s.id == shift.storeId,
+            orElse: () => stores.first,
+          );
+          issues.add(_ShiftIssue(
+            type: _IssueType.unsetTime,
+            date: date,
+            dateIndex: dateIndex,
+            storeName: store.name,
+            storeColor: store.color,
+          ));
+        }
+      }
+
+      // 時間重複をチェック
+      final shiftsWithTime = shiftsOnDate.where((s) => s.hasTime).toList();
+      if (shiftsWithTime.length >= 2) {
+        for (int i = 0; i < shiftsWithTime.length; i++) {
+          for (int j = i + 1; j < shiftsWithTime.length; j++) {
+            final shift1 = shiftsWithTime[i];
+            final shift2 = shiftsWithTime[j];
+
+            final start1Parts = shift1.startTime!.split(':');
+            final end1Parts = shift1.endTime!.split(':');
+            final start2Parts = shift2.startTime!.split(':');
+            final end2Parts = shift2.endTime!.split(':');
+
+            double start1 = int.parse(start1Parts[0]) + int.parse(start1Parts[1]) / 60.0;
+            double end1 = int.parse(end1Parts[0]) + int.parse(end1Parts[1]) / 60.0;
+            double start2 = int.parse(start2Parts[0]) + int.parse(start2Parts[1]) / 60.0;
+            double end2 = int.parse(end2Parts[0]) + int.parse(end2Parts[1]) / 60.0;
+
+            if (end1 <= start1) end1 = 24.0;
+            if (end2 <= start2) end2 = 24.0;
+
+            // 重複チェック
+            if (start1 < end2 && start2 < end1) {
+              final store1 = stores.firstWhere(
+                (s) => s.id == shift1.storeId,
+                orElse: () => stores.first,
+              );
+              final store2 = stores.firstWhere(
+                (s) => s.id == shift2.storeId,
+                orElse: () => stores.first,
+              );
+              issues.add(_ShiftIssue(
+                type: _IssueType.overlap,
+                date: date,
+                dateIndex: dateIndex,
+                storeName: store1.name,
+                storeColor: store1.color,
+                overlapInfo: _OverlapInfo(
+                  store1Name: store1.name,
+                  store1Color: store1.color,
+                  store1Time: '${shift1.startTime}-${shift1.endTime}',
+                  store2Name: store2.name,
+                  store2Color: store2.color,
+                  store2Time: '${shift2.startTime}-${shift2.endTime}',
+                ),
+              ));
+            }
+          }
+        }
+      }
+    }
+
+    return issues;
+  }
+
+  // カードへスクロール
+  void _scrollToCard(int dateIndex) {
+    // カード1つの高さは約140px（margin含む）
+    const cardHeight = 140.0;
+    final targetOffset = dateIndex * cardHeight;
+
+    _scrollController.animateTo(
+      targetOffset,
+      duration: const Duration(milliseconds: 500),
+      curve: Curves.easeInOut,
+    );
+
+    // パネルを閉じる
+    setState(() {
+      _isIssuesPanelExpanded = false;
+    });
   }
 
   bool _isWeekendOrHoliday(DateTime day) {
@@ -2362,6 +2474,7 @@ class _TimeSettingListPageState extends ConsumerState<_TimeSettingListPage>
       });
 
     return ListView.builder(
+      controller: _scrollController,
       padding: const EdgeInsets.only(top: 8, bottom: 16),
       itemCount: sortedDateKeys.length,
       itemBuilder: (context, index) {
@@ -2925,8 +3038,10 @@ class _TimeSettingListPageState extends ConsumerState<_TimeSettingListPage>
   @override
   Widget build(BuildContext context) {
     final shiftDates = ref.watch(shiftDateProvider);
+    final stores = ref.watch(storeProvider);
     final stats = _calculateStatistics(shiftDates);
-    final hasUnsetTimes = shiftDates.any((s) => s.startTime == null || s.endTime == null);
+    final issues = _detectIssues(shiftDates, stores);
+    final hasIssues = issues.isNotEmpty;
 
     return Scaffold(
       body: shiftDates.isEmpty
@@ -3369,6 +3484,10 @@ class _TimeSettingListPageState extends ConsumerState<_TimeSettingListPage>
                   child: _buildShiftListByStore(shiftDates),
                 ),
 
+                // 問題パネル（問題がある場合のみ表示）
+                if (hasIssues)
+                  _buildIssuesPanel(issues),
+
                 // 統計情報表示（下部固定・SafeAreaでラップ）
                 SafeArea(
                   child: Container(
@@ -3386,34 +3505,6 @@ class _TimeSettingListPageState extends ConsumerState<_TimeSettingListPage>
                     ),
                     child: Column(
                       children: [
-                        if (hasUnsetTimes)
-                          FadeTransition(
-                            opacity: _blinkAnimation,
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                              margin: const EdgeInsets.only(bottom: 8),
-                              decoration: BoxDecoration(
-                                color: Colors.red.shade100,
-                                borderRadius: BorderRadius.circular(8),
-                                border: Border.all(color: Colors.red, width: 2),
-                              ),
-                              child: Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Icon(Icons.warning, color: Colors.red, size: 18),
-                                  const SizedBox(width: 8),
-                                  const Text(
-                                    '時間未設定の日あり',
-                                    style: TextStyle(
-                                      fontSize: 13,
-                                      color: Colors.red,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceAround,
                           children: [
@@ -3443,6 +3534,259 @@ class _TimeSettingListPageState extends ConsumerState<_TimeSettingListPage>
                 ),
               ],
             ),
+    );
+  }
+
+  // 問題パネルを構築
+  Widget _buildIssuesPanel(List<_ShiftIssue> issues) {
+    final unsetCount = issues.where((i) => i.type == _IssueType.unsetTime).length;
+    final overlapCount = issues.where((i) => i.type == _IssueType.overlap).length;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.red.shade50,
+        border: Border(
+          top: BorderSide(color: Colors.red.shade300, width: 1),
+        ),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // ヘッダー（タップで展開）
+          InkWell(
+            onTap: () {
+              setState(() {
+                _isIssuesPanelExpanded = !_isIssuesPanelExpanded;
+              });
+            },
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              child: Row(
+                children: [
+                  AnimatedBuilder(
+                    animation: _blinkAnimation,
+                    builder: (context, child) {
+                      return Opacity(
+                        opacity: _blinkAnimation.value,
+                        child: Icon(
+                          Icons.warning_amber_rounded,
+                          color: Colors.red,
+                          size: 22,
+                        ),
+                      );
+                    },
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      '${issues.length}件の問題があります',
+                      style: TextStyle(
+                        color: Colors.red.shade800,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 14,
+                      ),
+                    ),
+                  ),
+                  // 問題サマリー（アイコン＋件数）
+                  if (unsetCount > 0)
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                      margin: const EdgeInsets.only(right: 8),
+                      decoration: BoxDecoration(
+                        color: Colors.orange.shade100,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.schedule, size: 14, color: Colors.orange.shade800),
+                          const SizedBox(width: 4),
+                          Text(
+                            '$unsetCount',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.orange.shade800,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  if (overlapCount > 0)
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: Colors.red.shade100,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.layers, size: 14, color: Colors.red.shade800),
+                          const SizedBox(width: 4),
+                          Text(
+                            '$overlapCount',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.red.shade800,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  const SizedBox(width: 8),
+                  Icon(
+                    _isIssuesPanelExpanded
+                        ? Icons.keyboard_arrow_down
+                        : Icons.keyboard_arrow_up,
+                    color: Colors.red.shade600,
+                  ),
+                ],
+              ),
+            ),
+          ),
+
+          // 展開時の問題リスト
+          AnimatedCrossFade(
+            firstChild: const SizedBox.shrink(),
+            secondChild: Container(
+              constraints: const BoxConstraints(maxHeight: 200),
+              child: ListView.builder(
+                shrinkWrap: true,
+                padding: const EdgeInsets.only(bottom: 8),
+                itemCount: issues.length,
+                itemBuilder: (context, index) {
+                  final issue = issues[index];
+                  final weekdays = ['月', '火', '水', '木', '金', '土', '日'];
+                  final weekday = weekdays[issue.date.weekday - 1];
+                  final isHoliday = JapaneseHolidays.isHoliday(issue.date);
+
+                  Color dateColor = Colors.black87;
+                  if (isHoliday || issue.date.weekday == DateTime.sunday) {
+                    dateColor = Colors.red;
+                  } else if (issue.date.weekday == DateTime.saturday) {
+                    dateColor = Colors.blue;
+                  }
+
+                  return InkWell(
+                    onTap: () => _scrollToCard(issue.dateIndex),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      child: Row(
+                        children: [
+                          // 問題タイプアイコン
+                          Container(
+                            width: 28,
+                            height: 28,
+                            decoration: BoxDecoration(
+                              color: issue.type == _IssueType.unsetTime
+                                  ? Colors.orange.shade100
+                                  : Colors.red.shade100,
+                              shape: BoxShape.circle,
+                            ),
+                            child: Icon(
+                              issue.type == _IssueType.unsetTime
+                                  ? Icons.schedule
+                                  : Icons.layers,
+                              size: 16,
+                              color: issue.type == _IssueType.unsetTime
+                                  ? Colors.orange.shade800
+                                  : Colors.red.shade800,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          // 日付
+                          Text(
+                            '${issue.date.month}/${issue.date.day}',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              color: dateColor,
+                              fontSize: 14,
+                            ),
+                          ),
+                          Text(
+                            '($weekday)',
+                            style: TextStyle(
+                              color: dateColor,
+                              fontSize: 12,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          // 詳細
+                          Expanded(
+                            child: issue.type == _IssueType.unsetTime
+                                ? Row(
+                                    children: [
+                                      Container(
+                                        width: 10,
+                                        height: 10,
+                                        decoration: BoxDecoration(
+                                          color: issue.storeColor,
+                                          shape: BoxShape.circle,
+                                          border: Border.all(
+                                            color: issue.storeColor == Colors.white
+                                                ? Colors.grey
+                                                : Colors.transparent,
+                                          ),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 6),
+                                      Expanded(
+                                        child: Text(
+                                          '${issue.storeName} - 時間未設定',
+                                          style: TextStyle(
+                                            fontSize: 13,
+                                            color: Colors.grey.shade700,
+                                          ),
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ),
+                                    ],
+                                  )
+                                : Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        '時間重複',
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          color: Colors.red.shade700,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                      if (issue.overlapInfo != null)
+                                        Text(
+                                          '${issue.overlapInfo!.store1Name} ${issue.overlapInfo!.store1Time} / ${issue.overlapInfo!.store2Name} ${issue.overlapInfo!.store2Time}',
+                                          style: TextStyle(
+                                            fontSize: 11,
+                                            color: Colors.grey.shade600,
+                                          ),
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                    ],
+                                  ),
+                          ),
+                          // 矢印アイコン
+                          Icon(
+                            Icons.chevron_right,
+                            color: Colors.grey.shade400,
+                            size: 20,
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+            crossFadeState: _isIssuesPanelExpanded
+                ? CrossFadeState.showSecond
+                : CrossFadeState.showFirst,
+            duration: const Duration(milliseconds: 300),
+          ),
+        ],
+      ),
     );
   }
 
@@ -4456,4 +4800,48 @@ class _TimeRange {
   final String storeId;
 
   _TimeRange(this.start, this.end, this.storeId);
+}
+
+// 問題の種類
+enum _IssueType {
+  unsetTime,
+  overlap,
+}
+
+// 重複情報
+class _OverlapInfo {
+  final String store1Name;
+  final Color store1Color;
+  final String store1Time;
+  final String store2Name;
+  final Color store2Color;
+  final String store2Time;
+
+  _OverlapInfo({
+    required this.store1Name,
+    required this.store1Color,
+    required this.store1Time,
+    required this.store2Name,
+    required this.store2Color,
+    required this.store2Time,
+  });
+}
+
+// シフトの問題を表すクラス
+class _ShiftIssue {
+  final _IssueType type;
+  final DateTime date;
+  final int dateIndex;
+  final String storeName;
+  final Color storeColor;
+  final _OverlapInfo? overlapInfo;
+
+  _ShiftIssue({
+    required this.type,
+    required this.date,
+    required this.dateIndex,
+    required this.storeName,
+    required this.storeColor,
+    this.overlapInfo,
+  });
 }
