@@ -2211,6 +2211,12 @@ class _TimeSettingListPageState extends ConsumerState<_TimeSettingListPage>
   final ScrollController _scrollController = ScrollController();
   bool _isIssuesPanelExpanded = false; // 問題パネルの開閉状態
 
+  // タイムライン編集モード用
+  ShiftDate? _editingShift;
+  Store? _editingStore;
+  double? _editingStartHour;
+  double? _editingEndHour;
+
   @override
   void initState() {
     super.initState();
@@ -2623,25 +2629,6 @@ class _TimeSettingListPageState extends ConsumerState<_TimeSettingListPage>
         final isSunday = currentDate.weekday == DateTime.sunday;
         final isSaturday = currentDate.weekday == DateTime.saturday;
 
-        // 前日からの継続シフトを検出
-        final previousDate = currentDate.subtract(const Duration(days: 1));
-        final carryoverShifts = <ShiftDate>[];
-        if (dateSet.contains(previousDate)) {
-          for (final shift in dateGroups[previousDate]!) {
-            if (shift.hasTime) {
-              final startParts = shift.startTime!.split(':');
-              final endParts = shift.endTime!.split(':');
-              final startHour = int.parse(startParts[0]);
-              final endHour = int.parse(endParts[0]);
-              final endMinute = int.parse(endParts[1]);
-              // 終了時刻が開始時刻より小さい場合、翌日にまたがる
-              if (endHour < startHour || (endHour == 0 && endMinute > 0)) {
-                carryoverShifts.add(shift as ShiftDate);
-              }
-            }
-          }
-        }
-
         // 翌日のカードが存在するかチェック（日またぎ表示判定用）
         final nextDate = currentDate.add(const Duration(days: 1));
         final hasNextDayCard = dateSet.contains(nextDate);
@@ -2767,7 +2754,6 @@ class _TimeSettingListPageState extends ConsumerState<_TimeSettingListPage>
                   _buildLargeTimelineBar(
                     shiftsOnDate.cast<ShiftDate>(),
                     stores,
-                    carryoverShifts: carryoverShifts,
                     hasNextDayCard: hasNextDayCard,
                   ),
                   // 時間未設定の警告
@@ -2869,12 +2855,11 @@ class _TimeSettingListPageState extends ConsumerState<_TimeSettingListPage>
   Widget _buildLargeTimelineBar(
     List<ShiftDate> shifts,
     List<Store> stores, {
-    List<ShiftDate> carryoverShifts = const [],
     bool hasNextDayCard = false,
   }) {
     final shiftsWithTime = shifts.where((s) => s.hasTime).toList();
-    // 継続シフトも含めたレーン数を計算
-    final totalLaneCount = (shiftsWithTime.length + carryoverShifts.length).clamp(1, 4);
+    // レーン数を計算
+    final totalLaneCount = shiftsWithTime.length.clamp(1, 4);
     // レーン数に応じて高さを調整（1レーン: 24px、最大4レーンまで）
     final barHeight = (24.0 * totalLaneCount).toDouble();
 
@@ -2899,51 +2884,9 @@ class _TimeSettingListPageState extends ConsumerState<_TimeSettingListPage>
                   size: Size(double.infinity, barHeight),
                   painter: _TimelineScalePainter(),
                 ),
-                // 前日からの継続シフト（半透明で表示）
-                ...carryoverShifts.asMap().entries.map((entry) {
-                  final index = entry.key;
-                  final shift = entry.value;
-                  final store = stores.firstWhere(
-                    (s) => s.id == shift.storeId,
-                    orElse: () => stores.first,
-                  );
-                  final endParts = shift.endTime!.split(':');
-                  final endHour = int.parse(endParts[0]) + int.parse(endParts[1]) / 60.0;
-
-                  final endPercent = endHour / 24.0;
-                  final laneHeight = barHeight / totalLaneCount;
-                  final laneTop = index * laneHeight;
-
-                  return Positioned(
-                    left: 0,
-                    width: endPercent * containerWidth,
-                    top: laneTop + 2,
-                    height: laneHeight - 4,
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: (store.color == Colors.white ? Colors.grey.shade400 : store.color).withValues(alpha: 0.4),
-                        borderRadius: BorderRadius.circular(4),
-                        border: Border.all(
-                          color: store.color == Colors.white ? Colors.grey : store.color,
-                          width: 1,
-                        ),
-                      ),
-                      child: Center(
-                        child: Text(
-                          '← 前日から',
-                          style: TextStyle(
-                            color: Colors.grey.shade700,
-                            fontSize: 9,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                    ),
-                  );
-                }),
-                // 当日のシフトバー（ドラッグ可能）
+                // シフトバー（ドラッグ可能）
                 ...shiftsWithTime.asMap().entries.map((entry) {
-                  final index = entry.key + carryoverShifts.length;
+                  final index = entry.key;
                   final shift = entry.value;
                   final store = stores.firstWhere(
                     (s) => s.id == shift.storeId,
@@ -2969,6 +2912,7 @@ class _TimeSettingListPageState extends ConsumerState<_TimeSettingListPage>
                         endTime,
                       );
                     },
+                    onEditRequest: () => _startTimelineEdit(shift, store),
                   );
                 }),
               ],
@@ -2976,6 +2920,273 @@ class _TimeSettingListPageState extends ConsumerState<_TimeSettingListPage>
           ),
         );
       },
+    );
+  }
+
+  // タイムライン編集モードを開始
+  void _startTimelineEdit(ShiftDate shift, Store store) {
+    final startParts = shift.startTime!.split(':');
+    final endParts = shift.endTime!.split(':');
+    double startHour = int.parse(startParts[0]) + int.parse(startParts[1]) / 60.0;
+    double endHour = int.parse(endParts[0]) + int.parse(endParts[1]) / 60.0;
+    if (endHour <= startHour) endHour += 24;
+
+    setState(() {
+      _editingShift = shift;
+      _editingStore = store;
+      _editingStartHour = startHour;
+      _editingEndHour = endHour;
+    });
+    HapticFeedback.mediumImpact();
+  }
+
+  // タイムライン編集モードを終了
+  void _endTimelineEdit({bool save = true}) {
+    if (save && _editingShift != null && _editingStartHour != null && _editingEndHour != null) {
+      final startTime = _hourToTimeString(_editingStartHour!);
+      double endHour = _editingEndHour!;
+      if (endHour >= 24) endHour -= 24;
+      final endTime = _hourToTimeString(endHour);
+
+      ref.read(shiftDateProvider.notifier).updateTime(
+        _editingShift!.uniqueKey,
+        startTime,
+        endTime,
+      );
+    }
+
+    setState(() {
+      _editingShift = null;
+      _editingStore = null;
+      _editingStartHour = null;
+      _editingEndHour = null;
+    });
+  }
+
+  double _snapToQuarter(double hour) {
+    return (hour * 4).round() / 4.0;
+  }
+
+  String _hourToTimeString(double hour) {
+    if (hour < 0) hour = 0;
+    if (hour >= 24) hour = hour - 24;
+    final h = hour.floor();
+    final m = ((hour - h) * 60).round();
+    return '${h.toString().padLeft(2, '0')}:${m.toString().padLeft(2, '0')}';
+  }
+
+  // タイムライン編集オーバーレイを構築
+  Widget _buildTimelineEditOverlay() {
+    if (_editingShift == null || _editingStore == null) {
+      return const SizedBox.shrink();
+    }
+
+    final store = _editingStore!;
+    final isWhite = store.color == Colors.white;
+    final storeColor = isWhite ? Colors.grey.shade600 : store.color;
+
+    final rangeStart = (_editingStartHour! - 2).clamp(0.0, 20.0);
+    final rangeEnd = (_editingEndHour! + 2).clamp(4.0, 28.0);
+    final rangeHours = (rangeEnd - rangeStart).clamp(4.0, 24.0);
+
+    return GestureDetector(
+      onHorizontalDragStart: (_) {},
+      onHorizontalDragUpdate: (_) {},
+      onHorizontalDragEnd: (_) {},
+      onVerticalDragStart: (_) {},
+      onVerticalDragUpdate: (_) {},
+      onVerticalDragEnd: (_) {},
+      behavior: HitTestBehavior.opaque,
+      child: Stack(
+        children: [
+          GestureDetector(
+            onTap: () => _endTimelineEdit(save: true),
+            behavior: HitTestBehavior.opaque,
+            child: Container(color: Colors.black.withValues(alpha: 0.6)),
+          ),
+          Center(
+            child: Container(
+              margin: const EdgeInsets.symmetric(horizontal: 20),
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(16),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.3),
+                    blurRadius: 20,
+                    offset: const Offset(0, 10),
+                  ),
+                ],
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        width: 16,
+                        height: 16,
+                        decoration: BoxDecoration(
+                          color: storeColor,
+                          shape: BoxShape.circle,
+                          border: isWhite ? Border.all(color: Colors.grey) : null,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          '${store.name} - ${_editingShift!.date.month}/${_editingShift!.date.day}',
+                          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.close),
+                        onPressed: () => _endTimelineEdit(save: false),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 20),
+                  Text(
+                    '${_hourToTimeString(_editingStartHour!)} - ${_hourToTimeString(_editingEndHour! >= 24 ? _editingEndHour! - 24 : _editingEndHour!)}',
+                    style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: storeColor),
+                  ),
+                  if (_editingEndHour! >= 24)
+                    Text('(翌日)', style: TextStyle(fontSize: 14, color: Colors.grey.shade600)),
+                  const SizedBox(height: 24),
+                  LayoutBuilder(
+                    builder: (context, constraints) {
+                      final width = constraints.maxWidth;
+                      final startPercent = (_editingStartHour! - rangeStart) / rangeHours;
+                      final endPercent = (_editingEndHour!.clamp(rangeStart, rangeEnd) - rangeStart) / rangeHours;
+
+                      List<int> generateTimeLabels() {
+                        final labels = <int>[];
+                        for (int h = rangeStart.floor(); h <= rangeEnd.ceil(); h += 2) {
+                          if (h >= 0) labels.add(h);
+                        }
+                        return labels;
+                      }
+
+                      return Column(
+                        children: [
+                          SizedBox(
+                            height: 20,
+                            child: Stack(
+                              children: generateTimeLabels().map((h) {
+                                final pos = (h - rangeStart) / rangeHours;
+                                final displayHour = h >= 24 ? h - 24 : h;
+                                final isNextDay = h >= 24;
+                                return Positioned(
+                                  left: pos * width - 10,
+                                  child: Text(
+                                    isNextDay ? '翌$displayHour' : '$displayHour',
+                                    style: TextStyle(
+                                      fontSize: 10,
+                                      color: isNextDay ? Colors.orange.shade700 : Colors.grey.shade500,
+                                      fontWeight: isNextDay ? FontWeight.bold : FontWeight.normal,
+                                    ),
+                                  ),
+                                );
+                              }).toList(),
+                            ),
+                          ),
+                          SizedBox(
+                            height: 60,
+                            child: Stack(
+                              clipBehavior: Clip.none,
+                              children: [
+                                Container(
+                                  height: 40,
+                                  margin: const EdgeInsets.symmetric(vertical: 10),
+                                  decoration: BoxDecoration(
+                                    color: Colors.grey.shade200,
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                ),
+                                Positioned(
+                                  left: (startPercent * width).clamp(0.0, width),
+                                  width: ((endPercent - startPercent) * width).clamp(0.0, width),
+                                  top: 10,
+                                  height: 40,
+                                  child: Container(
+                                    decoration: BoxDecoration(
+                                      color: storeColor.withValues(alpha: 0.3),
+                                      borderRadius: BorderRadius.circular(8),
+                                      border: Border.all(color: storeColor, width: 2),
+                                    ),
+                                  ),
+                                ),
+                                Positioned(
+                                  left: (startPercent * width - 15).clamp(-15.0, width - 15),
+                                  top: 0,
+                                  child: GestureDetector(
+                                    onHorizontalDragUpdate: (details) {
+                                      setState(() {
+                                        double newHour = _editingStartHour! + (details.delta.dx / width) * rangeHours;
+                                        newHour = _snapToQuarter(newHour);
+                                        final minStart = (_editingEndHour! - 12.0).clamp(0.0, 23.75);
+                                        newHour = newHour.clamp(minStart, _editingEndHour! - 0.25);
+                                        _editingStartHour = newHour;
+                                      });
+                                    },
+                                    child: Container(
+                                      width: 30,
+                                      height: 60,
+                                      decoration: BoxDecoration(color: storeColor, borderRadius: BorderRadius.circular(8)),
+                                      child: const Icon(Icons.chevron_left, color: Colors.white),
+                                    ),
+                                  ),
+                                ),
+                                Positioned(
+                                  left: (endPercent * width - 15).clamp(-15.0, width - 15),
+                                  top: 0,
+                                  child: GestureDetector(
+                                    onHorizontalDragUpdate: (details) {
+                                      setState(() {
+                                        double newHour = _editingEndHour! + (details.delta.dx / width) * rangeHours;
+                                        newHour = _snapToQuarter(newHour);
+                                        final maxEnd = (_editingStartHour! + 12.0).clamp(0.25, 36.0);
+                                        newHour = newHour.clamp(_editingStartHour! + 0.25, maxEnd);
+                                        _editingEndHour = newHour;
+                                      });
+                                    },
+                                    child: Container(
+                                      width: 30,
+                                      height: 60,
+                                      decoration: BoxDecoration(color: storeColor, borderRadius: BorderRadius.circular(8)),
+                                      child: const Icon(Icons.chevron_right, color: Colors.white),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      );
+                    },
+                  ),
+                  const SizedBox(height: 24),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton.icon(
+                      onPressed: () => _endTimelineEdit(save: true),
+                      icon: const Icon(Icons.check),
+                      label: const Text('確定'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: storeColor,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -3234,8 +3445,10 @@ class _TimeSettingListPageState extends ConsumerState<_TimeSettingListPage>
     final issues = _detectIssues(shiftDates, stores);
     final hasIssues = issues.isNotEmpty;
 
-    return Scaffold(
-      body: shiftDates.isEmpty
+    return Stack(
+      children: [
+        Scaffold(
+          body: shiftDates.isEmpty
           ? Center(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
@@ -4693,6 +4906,9 @@ class _MonthAccordionState extends State<_MonthAccordion>
             }),
         ],
       ),
+        ),
+        _buildTimelineEditOverlay(),
+      ],
     );
   }
 }
@@ -5061,6 +5277,7 @@ class _DraggableShiftBar extends StatefulWidget {
   final double containerWidth;
   final bool hasNextDayCard;
   final Function(String uniqueKey, String startTime, String endTime) onTimeChanged;
+  final VoidCallback? onEditRequest;
 
   const _DraggableShiftBar({
     super.key,
@@ -5072,6 +5289,7 @@ class _DraggableShiftBar extends StatefulWidget {
     required this.containerWidth,
     required this.hasNextDayCard,
     required this.onTimeChanged,
+    this.onEditRequest,
   });
 
   @override
@@ -5128,6 +5346,8 @@ class _DraggableShiftBarState extends State<_DraggableShiftBar> {
     });
     // ハプティックフィードバック
     HapticFeedback.mediumImpact();
+    // 編集モードのオーバーレイを表示
+    widget.onEditRequest?.call();
   }
 
   void _onPanStart(DragStartDetails details) {
