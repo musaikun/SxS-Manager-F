@@ -5213,15 +5213,6 @@ class _TimelineScalePainter extends CustomPainter {
   bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
 
-// 時間範囲を表すヘルパークラス
-class _TimeRange {
-  final double start;
-  final double end;
-  final String storeId;
-
-  _TimeRange(this.start, this.end, this.storeId);
-}
-
 // 問題の種類
 enum _IssueType {
   unsetTime,
