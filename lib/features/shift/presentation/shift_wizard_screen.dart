@@ -1198,6 +1198,9 @@ class _DateSelectionPageState extends ConsumerState<_DateSelectionPage> {
                     displayStoreIds.add(shift.storeId);
                   }
 
+                  // 店舗リストの順序に従ってフィルタリング
+                  final displayStores = stores.where((s) => displayStoreIds.contains(s.id)).toList();
+
                   return GestureDetector(
                     onLongPress: shifts.isNotEmpty ? () {
                       _showShiftDetailDialog(context, day, shifts, stores);
@@ -1230,19 +1233,15 @@ class _DateSelectionPageState extends ConsumerState<_DateSelectionPage> {
                                 fontSize: 16,
                               ),
                             ),
-                            // 店舗ドット（登録済みシフトのみ表示）
-                            if (displayStoreIds.isNotEmpty) ...[
+                            // 店舗ドット（店舗リストの順序で表示）
+                            if (displayStores.isNotEmpty) ...[
                               const SizedBox(height: 2),
                               SizedBox(
                                 height: 6,
                                 child: Row(
                                   mainAxisAlignment: MainAxisAlignment.center,
                                   mainAxisSize: MainAxisSize.min,
-                                  children: displayStoreIds.take(4).map((storeId) {
-                                    final store = stores.firstWhere(
-                                      (s) => s.id == storeId,
-                                      orElse: () => stores.first,
-                                    );
+                                  children: displayStores.take(4).map((store) {
                                     final dotColor = store.color;
                                     final isWhite = dotColor == Colors.white;
 
@@ -1280,6 +1279,14 @@ class _DateSelectionPageState extends ConsumerState<_DateSelectionPage> {
                       .getShiftsForDate(day);
                   final stores = ref.read(storeProvider);
 
+                  // 表示する店舗IDのセットを作成
+                  final displayStoreIds = <String>{};
+                  for (final shift in shifts) {
+                    displayStoreIds.add(shift.storeId);
+                  }
+                  // 店舗リストの順序に従ってフィルタリング
+                  final displayStores = stores.where((s) => displayStoreIds.contains(s.id)).toList();
+
                   // 祝日はピンク色
                   if (_isHoliday(day)) {
                     textColor = Colors.pink;
@@ -1312,19 +1319,15 @@ class _DateSelectionPageState extends ConsumerState<_DateSelectionPage> {
                               fontWeight: FontWeight.bold,
                             ),
                           ),
-                          // 店舗ドット（登録済みの店舗のみ表示）
-                          if (shifts.isNotEmpty) ...[
+                          // 店舗ドット（店舗リストの順序で表示）
+                          if (displayStores.isNotEmpty) ...[
                             const SizedBox(height: 2),
                             SizedBox(
                               height: 5,
                               child: Row(
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 mainAxisSize: MainAxisSize.min,
-                                children: shifts.take(4).map((shift) {
-                                  final store = stores.firstWhere(
-                                    (s) => s.id == shift.storeId,
-                                    orElse: () => stores.first,
-                                  );
+                                children: displayStores.take(4).map((store) {
                                   final dotColor = store.color;
                                   final isWhite = dotColor == Colors.white;
 
@@ -1361,6 +1364,14 @@ class _DateSelectionPageState extends ConsumerState<_DateSelectionPage> {
                       .getShiftsForDate(day);
                   final stores = ref.read(storeProvider);
 
+                  // 表示する店舗IDのセットを作成
+                  final displayStoreIds = <String>{};
+                  for (final shift in shifts) {
+                    displayStoreIds.add(shift.storeId);
+                  }
+                  // 店舗リストの順序に従ってフィルタリング
+                  final displayStores = stores.where((s) => displayStoreIds.contains(s.id)).toList();
+
                   // 祝日はピンク色
                   if (_isHoliday(day)) {
                     textColor = Colors.pink;
@@ -1393,19 +1404,15 @@ class _DateSelectionPageState extends ConsumerState<_DateSelectionPage> {
                               fontWeight: FontWeight.w600,
                             ),
                           ),
-                          // 店舗ドット（登録済みの店舗のみ表示）
-                          if (shifts.isNotEmpty) ...[
+                          // 店舗ドット（店舗リストの順序で表示）
+                          if (displayStores.isNotEmpty) ...[
                             const SizedBox(height: 2),
                             SizedBox(
                               height: 5,
                               child: Row(
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 mainAxisSize: MainAxisSize.min,
-                                children: shifts.take(4).map((shift) {
-                                  final store = stores.firstWhere(
-                                    (s) => s.id == shift.storeId,
-                                    orElse: () => stores.first,
-                                  );
+                                children: displayStores.take(4).map((store) {
                                   final dotColor = store.color;
                                   final isWhite = dotColor == Colors.white;
 
@@ -1558,7 +1565,7 @@ class _DateSelectionPageState extends ConsumerState<_DateSelectionPage> {
             // DateTime.sunday=7, Monday=1なので、日曜は7、月〜土は1〜6
             final weekday = index == 0 ? DateTime.sunday : index;
             final isFullySelected = _isWeekdayFullySelected(weekday);
-            final storesWithShifts = _getStoresWithShiftsForWeekday(weekday);
+            final storesWithShifts = _getStoresWithShiftsForWeekdaySorted(weekday);
 
             return Expanded(
               child: Padding(
@@ -1572,7 +1579,10 @@ class _DateSelectionPageState extends ConsumerState<_DateSelectionPage> {
                         padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
                         side: BorderSide(color: isFullySelected ? Colors.green : colors[index], width: 1.5),
                         backgroundColor: isFullySelected ? Colors.green : null,
-                        minimumSize: const Size(0, 36),
+                        minimumSize: const Size(44, 36),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(6),
+                        ),
                       ),
                       child: Text(
                         weekdays[index],
@@ -1583,7 +1593,7 @@ class _DateSelectionPageState extends ConsumerState<_DateSelectionPage> {
                         ),
                       ),
                     ),
-                    // 店舗ドット表示
+                    // 店舗ドット表示（店舗リストの順序に従って表示）
                     if (storesWithShifts.isNotEmpty)
                       Padding(
                         padding: const EdgeInsets.only(top: 4),
@@ -1626,7 +1636,7 @@ class _DateSelectionPageState extends ConsumerState<_DateSelectionPage> {
             final week = index + 1; // 第1週〜第5週
             final isFullySelected = _isWeekOfMonthFullySelected(week);
             final hasWeek = _hasWeekOfMonth(week);
-            final storesWithShifts = _getStoresWithShiftsForWeek(week);
+            final storesWithShifts = _getStoresWithShiftsForWeekSorted(week);
 
             return Expanded(
               child: Padding(
@@ -1637,7 +1647,7 @@ class _DateSelectionPageState extends ConsumerState<_DateSelectionPage> {
                     OutlinedButton(
                       onPressed: hasWeek ? () => _toggleWeekOfMonth(week) : null,
                       style: OutlinedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
+                        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
                         side: BorderSide(
                           color: !hasWeek
                               ? Colors.grey.shade300
@@ -1645,7 +1655,10 @@ class _DateSelectionPageState extends ConsumerState<_DateSelectionPage> {
                           width: 1.5,
                         ),
                         backgroundColor: isFullySelected ? Colors.green : null,
-                        minimumSize: const Size(0, 36),
+                        minimumSize: const Size(44, 36),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(6),
+                        ),
                       ),
                       child: Text(
                         '第$week週',
@@ -1658,7 +1671,7 @@ class _DateSelectionPageState extends ConsumerState<_DateSelectionPage> {
                         ),
                       ),
                     ),
-                    // 店舗ドット表示
+                    // 店舗ドット表示（店舗リストの順序に従って表示）
                     if (storesWithShifts.isNotEmpty)
                       Padding(
                         padding: const EdgeInsets.only(top: 4),
@@ -1741,6 +1754,22 @@ class _DateSelectionPageState extends ConsumerState<_DateSelectionPage> {
     }
 
     return result;
+  }
+
+  // 指定曜日にシフトがある店舗リストを取得（店舗リストの順序でソート済み）
+  List<Store> _getStoresWithShiftsForWeekdaySorted(int weekday) {
+    final shiftDates = ref.read(shiftDateProvider);
+    final stores = ref.read(storeProvider);
+    final storeIds = <String>{};
+
+    for (final shift in shiftDates) {
+      if (shift.date.weekday == weekday) {
+        storeIds.add(shift.storeId);
+      }
+    }
+
+    // 店舗リストの順序を維持してフィルタリング
+    return stores.where((s) => storeIds.contains(s.id)).toList();
   }
 
   // 店舗セレクター
@@ -4282,7 +4311,7 @@ class _TimeSettingListPageState extends ConsumerState<_TimeSettingListPage>
   Widget _buildWeekButton(String label, int week) {
     final isFullySelected = _isWeekOfMonthFullySelected(week);
     final hasWeek = _hasWeekOfMonth(week);
-    final storesWithShifts = _getStoresWithShiftsForWeek(week);
+    final storesWithShifts = _getStoresWithShiftsForWeekSorted(week);
 
     return Expanded(
       child: Padding(
@@ -4293,14 +4322,18 @@ class _TimeSettingListPageState extends ConsumerState<_TimeSettingListPage>
             OutlinedButton(
               onPressed: hasWeek ? () => _selectByWeekOfMonth(week) : null,
               style: OutlinedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(vertical: 6),
+                padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 8),
                 side: BorderSide(
                   color: !hasWeek
                       ? Colors.grey.shade300
                       : (isFullySelected ? Colors.green : Colors.grey),
+                  width: 1.5,
                 ),
                 backgroundColor: isFullySelected ? Colors.green : null,
-                minimumSize: const Size(0, 0),
+                minimumSize: const Size(44, 36),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(6),
+                ),
               ),
               child: Text(
                 label,
@@ -4313,7 +4346,7 @@ class _TimeSettingListPageState extends ConsumerState<_TimeSettingListPage>
                 ),
               ),
             ),
-            // 店舗ドット表示
+            // 店舗ドット表示（店舗リストの順序に従って表示）
             if (storesWithShifts.isNotEmpty)
               Padding(
                 padding: const EdgeInsets.only(top: 4),
@@ -4354,6 +4387,22 @@ class _TimeSettingListPageState extends ConsumerState<_TimeSettingListPage>
       }
     }
 
+    return stores.where((s) => storeIds.contains(s.id)).toList();
+  }
+
+  // 指定週にシフトがある店舗リストを取得（店舗リストの順序でソート済み）
+  List<Store> _getStoresWithShiftsForWeekSorted(int week) {
+    final shiftDates = ref.read(shiftDateProvider);
+    final stores = ref.read(storeProvider);
+    final storeIds = <String>{};
+
+    for (final shift in shiftDates) {
+      if (ShiftDateUtils.getWeekOfMonth(shift.date) == week) {
+        storeIds.add(shift.storeId);
+      }
+    }
+
+    // 店舗リストの順序を維持してフィルタリング
     return stores.where((s) => storeIds.contains(s.id)).toList();
   }
 

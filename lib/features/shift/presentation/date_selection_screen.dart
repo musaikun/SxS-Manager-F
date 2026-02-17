@@ -373,10 +373,13 @@ class _DateSelectionScreenState extends ConsumerState<DateSelectionScreen> {
                   for (final shift in shifts) {
                     displayStoreIds.add(shift.storeId);
                   }
-                  // 現在選択中の店舗IDを追加（最大4つまで）
-                  if (_selectedStoreId != null && displayStoreIds.length < 4) {
+                  // 現在選択中の店舗IDを追加
+                  if (_selectedStoreId != null) {
                     displayStoreIds.add(_selectedStoreId!);
                   }
+
+                  // 店舗リストの順序に従ってフィルタリング（最大4つまで）
+                  final displayStores = stores.where((s) => displayStoreIds.contains(s.id)).take(4).toList();
 
                   return Center(
                     child: Container(
@@ -441,20 +444,15 @@ class _DateSelectionScreenState extends ConsumerState<DateSelectionScreen> {
                               fontSize: 14,
                             ),
                           ),
-                          // 店舗ドット（登録済み + 選択中の店舗を表示）
-                          if (displayStoreIds.isNotEmpty) ...[
+                          // 店舗ドット（店舗リストの順序で表示）
+                          if (displayStores.isNotEmpty) ...[
                             const SizedBox(height: 2),
                             SizedBox(
                               height: 6,
                               child: Row(
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 mainAxisSize: MainAxisSize.min,
-                                children: displayStoreIds.take(4).map((storeId) {
-                                  // 店舗の実際の色を取得
-                                  final store = stores.firstWhere(
-                                    (s) => s.id == storeId,
-                                    orElse: () => stores.first,
-                                  );
+                                children: displayStores.map((store) {
                                   final dotColor = store.color;
                                   // 白ドットの場合は枠線を濃くする
                                   final isWhite = dotColor == Colors.white;
@@ -490,6 +488,14 @@ class _DateSelectionScreenState extends ConsumerState<DateSelectionScreen> {
                       .read(shiftDateProvider.notifier)
                       .getShiftsForDate(day);
                   final stores = ref.read(storeProvider);
+
+                  // 表示する店舗IDのセットを作成
+                  final displayStoreIds = <String>{};
+                  for (final shift in shifts) {
+                    displayStoreIds.add(shift.storeId);
+                  }
+                  // 店舗リストの順序に従ってフィルタリング
+                  final displayStores = stores.where((s) => displayStoreIds.contains(s.id)).take(4).toList();
 
                   Color textColor = Colors.black;
                   // 祝日をピンク色に（最優先）
@@ -569,17 +575,13 @@ class _DateSelectionScreenState extends ConsumerState<DateSelectionScreen> {
                             ),
                           ),
                           const SizedBox(height: 1),
-                          // 店舗ドット（登録済みの店舗のみ表示）
+                          // 店舗ドット（店舗リストの順序で表示）
                           SizedBox(
                             height: 5,
                             child: Row(
                               mainAxisAlignment: MainAxisAlignment.center,
                               mainAxisSize: MainAxisSize.min,
-                              children: shifts.take(4).map((shift) {
-                                final store = stores.firstWhere(
-                                  (s) => s.id == shift.storeId,
-                                  orElse: () => stores.first,
-                                );
+                              children: displayStores.map((store) {
                                 final dotColor = store.color;
                                 final isWhite = dotColor == Colors.white;
 
