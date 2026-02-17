@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:table_calendar/table_calendar.dart';
 import '../providers/shift_date_provider.dart';
@@ -282,13 +283,6 @@ class _DateSelectionPageState extends ConsumerState<_DateSelectionPage> {
     return shifts.any((s) =>
         ShiftDateUtils.normalizeDate(s.date) == normalized &&
         s.storeId == _selectedStoreId!);
-  }
-
-  // 任意の店舗でその日付にシフトがあるかチェック（ドット表示用）
-  bool _hasAnyShift(DateTime day) {
-    final normalized = ShiftDateUtils.normalizeDate(day);
-    final shifts = ref.read(shiftDateProvider);
-    return shifts.any((s) => ShiftDateUtils.normalizeDate(s.date) == normalized);
   }
 
   bool _isHoliday(DateTime day) {
@@ -2217,6 +2211,12 @@ class _TimeSettingListPageState extends ConsumerState<_TimeSettingListPage>
   final ScrollController _scrollController = ScrollController();
   bool _isIssuesPanelExpanded = false; // 問題パネルの開閉状態
 
+  // タイムライン編集モード用
+  ShiftDate? _editingShift;
+  Store? _editingStore;
+  double? _editingStartHour;
+  double? _editingEndHour;
+
   @override
   void initState() {
     super.initState();
@@ -2629,25 +2629,6 @@ class _TimeSettingListPageState extends ConsumerState<_TimeSettingListPage>
         final isSunday = currentDate.weekday == DateTime.sunday;
         final isSaturday = currentDate.weekday == DateTime.saturday;
 
-        // 前日からの継続シフトを検出
-        final previousDate = currentDate.subtract(const Duration(days: 1));
-        final carryoverShifts = <ShiftDate>[];
-        if (dateSet.contains(previousDate)) {
-          for (final shift in dateGroups[previousDate]!) {
-            if (shift.hasTime) {
-              final startParts = shift.startTime!.split(':');
-              final endParts = shift.endTime!.split(':');
-              final startHour = int.parse(startParts[0]);
-              final endHour = int.parse(endParts[0]);
-              final endMinute = int.parse(endParts[1]);
-              // 終了時刻が開始時刻より小さい場合、翌日にまたがる
-              if (endHour < startHour || (endHour == 0 && endMinute > 0)) {
-                carryoverShifts.add(shift as ShiftDate);
-              }
-            }
-          }
-        }
-
         // 翌日のカードが存在するかチェック（日またぎ表示判定用）
         final nextDate = currentDate.add(const Duration(days: 1));
         final hasNextDayCard = dateSet.contains(nextDate);
@@ -2773,7 +2754,6 @@ class _TimeSettingListPageState extends ConsumerState<_TimeSettingListPage>
                   _buildLargeTimelineBar(
                     shiftsOnDate.cast<ShiftDate>(),
                     stores,
-                    carryoverShifts: carryoverShifts,
                     hasNextDayCard: hasNextDayCard,
                   ),
                   // 時間未設定の警告
@@ -2875,142 +2855,337 @@ class _TimeSettingListPageState extends ConsumerState<_TimeSettingListPage>
   Widget _buildLargeTimelineBar(
     List<ShiftDate> shifts,
     List<Store> stores, {
-    List<ShiftDate> carryoverShifts = const [],
     bool hasNextDayCard = false,
   }) {
     final shiftsWithTime = shifts.where((s) => s.hasTime).toList();
-    // 継続シフトも含めたレーン数を計算
-    final totalLaneCount = (shiftsWithTime.length + carryoverShifts.length).clamp(1, 4);
+    // レーン数を計算
+    final totalLaneCount = shiftsWithTime.length.clamp(1, 4);
     // レーン数に応じて高さを調整（1レーン: 24px、最大4レーンまで）
     final barHeight = (24.0 * totalLaneCount).toDouble();
 
-    return Container(
-      width: double.infinity,
-      height: barHeight,
-      decoration: BoxDecoration(
-        color: Colors.grey.shade200,
-        borderRadius: BorderRadius.circular(6),
-      ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(6),
-        child: Stack(
-          children: [
-            // 時間目盛り（背景）
-            CustomPaint(
-              size: Size(double.infinity, barHeight),
-              painter: _TimelineScalePainter(),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final containerWidth = constraints.maxWidth;
+
+        return Container(
+          width: double.infinity,
+          height: barHeight,
+          decoration: BoxDecoration(
+            color: Colors.grey.shade200,
+            borderRadius: BorderRadius.circular(6),
+          ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(6),
+            child: Stack(
+              clipBehavior: Clip.none,
+              children: [
+                // 時間目盛り（背景）
+                CustomPaint(
+                  size: Size(double.infinity, barHeight),
+                  painter: _TimelineScalePainter(),
+                ),
+                // シフトバー（ドラッグ可能）
+                ...shiftsWithTime.asMap().entries.map((entry) {
+                  final index = entry.key;
+                  final shift = entry.value;
+                  final store = stores.firstWhere(
+                    (s) => s.id == shift.storeId,
+                    orElse: () => stores.first,
+                  );
+
+                  final laneHeight = barHeight / totalLaneCount;
+                  final laneTop = index * laneHeight;
+
+                  return _DraggableShiftBar(
+                    key: ValueKey(shift.uniqueKey),
+                    shift: shift,
+                    store: store,
+                    barHeight: barHeight,
+                    laneHeight: laneHeight,
+                    laneTop: laneTop,
+                    containerWidth: containerWidth,
+                    hasNextDayCard: hasNextDayCard,
+                    onTimeChanged: (uniqueKey, startTime, endTime) {
+                      ref.read(shiftDateProvider.notifier).updateTime(
+                        uniqueKey,
+                        startTime,
+                        endTime,
+                      );
+                    },
+                    onEditRequest: () => _startTimelineEdit(shift, store),
+                  );
+                }),
+              ],
             ),
-            // 前日からの継続シフト（半透明で表示）
-            ...carryoverShifts.asMap().entries.map((entry) {
-              final index = entry.key;
-              final shift = entry.value;
-              final store = stores.firstWhere(
-                (s) => s.id == shift.storeId,
-                orElse: () => stores.first,
-              );
-              final endParts = shift.endTime!.split(':');
-              final endHour = int.parse(endParts[0]) + int.parse(endParts[1]) / 60.0;
+          ),
+        );
+      },
+    );
+  }
 
-              final endPercent = endHour / 24.0;
-              final laneHeight = barHeight / totalLaneCount;
-              final laneTop = index * laneHeight;
+  // タイムライン編集モードを開始
+  void _startTimelineEdit(ShiftDate shift, Store store) {
+    final startParts = shift.startTime!.split(':');
+    final endParts = shift.endTime!.split(':');
+    double startHour = int.parse(startParts[0]) + int.parse(startParts[1]) / 60.0;
+    double endHour = int.parse(endParts[0]) + int.parse(endParts[1]) / 60.0;
+    if (endHour <= startHour) endHour += 24;
 
-              return Positioned(
-                left: 0,
-                width: endPercent * (MediaQuery.of(context).size.width - 48),
-                top: laneTop + 2,
-                height: laneHeight - 4,
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: (store.color == Colors.white ? Colors.grey.shade400 : store.color).withValues(alpha: 0.4),
-                    borderRadius: BorderRadius.circular(4),
-                    border: Border.all(
-                      color: store.color == Colors.white ? Colors.grey : store.color,
-                      width: 1,
-                    ),
+    setState(() {
+      _editingShift = shift;
+      _editingStore = store;
+      _editingStartHour = startHour;
+      _editingEndHour = endHour;
+    });
+    HapticFeedback.mediumImpact();
+  }
+
+  // タイムライン編集モードを終了
+  void _endTimelineEdit({bool save = true}) {
+    if (save && _editingShift != null && _editingStartHour != null && _editingEndHour != null) {
+      final startTime = _hourToTimeString(_editingStartHour!);
+      double endHour = _editingEndHour!;
+      if (endHour >= 24) endHour -= 24;
+      final endTime = _hourToTimeString(endHour);
+
+      ref.read(shiftDateProvider.notifier).updateTime(
+        _editingShift!.uniqueKey,
+        startTime,
+        endTime,
+      );
+    }
+
+    setState(() {
+      _editingShift = null;
+      _editingStore = null;
+      _editingStartHour = null;
+      _editingEndHour = null;
+    });
+  }
+
+  double _snapToQuarter(double hour) {
+    return (hour * 4).round() / 4.0;
+  }
+
+  String _hourToTimeString(double hour) {
+    if (hour < 0) hour = 0;
+    if (hour >= 24) hour = hour - 24;
+    final h = hour.floor();
+    final m = ((hour - h) * 60).round();
+    return '${h.toString().padLeft(2, '0')}:${m.toString().padLeft(2, '0')}';
+  }
+
+  // タイムライン編集オーバーレイを構築
+  Widget _buildTimelineEditOverlay() {
+    if (_editingShift == null || _editingStore == null) {
+      return const SizedBox.shrink();
+    }
+
+    final store = _editingStore!;
+    final isWhite = store.color == Colors.white;
+    final storeColor = isWhite ? Colors.grey.shade600 : store.color;
+
+    final rangeStart = (_editingStartHour! - 2).clamp(0.0, 20.0);
+    final rangeEnd = (_editingEndHour! + 2).clamp(4.0, 28.0);
+    final rangeHours = (rangeEnd - rangeStart).clamp(4.0, 24.0);
+
+    return GestureDetector(
+      onHorizontalDragStart: (_) {},
+      onHorizontalDragUpdate: (_) {},
+      onHorizontalDragEnd: (_) {},
+      onVerticalDragStart: (_) {},
+      onVerticalDragUpdate: (_) {},
+      onVerticalDragEnd: (_) {},
+      behavior: HitTestBehavior.opaque,
+      child: Stack(
+        children: [
+          GestureDetector(
+            onTap: () => _endTimelineEdit(save: true),
+            behavior: HitTestBehavior.opaque,
+            child: Container(color: Colors.black.withValues(alpha: 0.6)),
+          ),
+          Center(
+            child: Container(
+              margin: const EdgeInsets.symmetric(horizontal: 20),
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(16),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.3),
+                    blurRadius: 20,
+                    offset: const Offset(0, 10),
                   ),
-                  child: Center(
-                    child: Text(
-                      '← 前日から',
-                      style: TextStyle(
-                        color: Colors.grey.shade700,
-                        fontSize: 9,
-                        fontWeight: FontWeight.bold,
+                ],
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        width: 16,
+                        height: 16,
+                        decoration: BoxDecoration(
+                          color: storeColor,
+                          shape: BoxShape.circle,
+                          border: isWhite ? Border.all(color: Colors.grey) : null,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          '${store.name} - ${_editingShift!.date.month}/${_editingShift!.date.day}',
+                          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.close),
+                        onPressed: () => _endTimelineEdit(save: false),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 20),
+                  Text(
+                    '${_hourToTimeString(_editingStartHour!)} - ${_hourToTimeString(_editingEndHour! >= 24 ? _editingEndHour! - 24 : _editingEndHour!)}',
+                    style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: storeColor),
+                  ),
+                  if (_editingEndHour! >= 24)
+                    Text('(翌日)', style: TextStyle(fontSize: 14, color: Colors.grey.shade600)),
+                  const SizedBox(height: 24),
+                  LayoutBuilder(
+                    builder: (context, constraints) {
+                      final width = constraints.maxWidth;
+                      final startPercent = (_editingStartHour! - rangeStart) / rangeHours;
+                      final endPercent = (_editingEndHour!.clamp(rangeStart, rangeEnd) - rangeStart) / rangeHours;
+
+                      List<int> generateTimeLabels() {
+                        final labels = <int>[];
+                        for (int h = rangeStart.floor(); h <= rangeEnd.ceil(); h += 2) {
+                          if (h >= 0) labels.add(h);
+                        }
+                        return labels;
+                      }
+
+                      return Column(
+                        children: [
+                          SizedBox(
+                            height: 20,
+                            child: Stack(
+                              children: generateTimeLabels().map((h) {
+                                final pos = (h - rangeStart) / rangeHours;
+                                final displayHour = h >= 24 ? h - 24 : h;
+                                final isNextDay = h >= 24;
+                                return Positioned(
+                                  left: pos * width - 10,
+                                  child: Text(
+                                    isNextDay ? '翌$displayHour' : '$displayHour',
+                                    style: TextStyle(
+                                      fontSize: 10,
+                                      color: isNextDay ? Colors.orange.shade700 : Colors.grey.shade500,
+                                      fontWeight: isNextDay ? FontWeight.bold : FontWeight.normal,
+                                    ),
+                                  ),
+                                );
+                              }).toList(),
+                            ),
+                          ),
+                          SizedBox(
+                            height: 60,
+                            child: Stack(
+                              clipBehavior: Clip.none,
+                              children: [
+                                Container(
+                                  height: 40,
+                                  margin: const EdgeInsets.symmetric(vertical: 10),
+                                  decoration: BoxDecoration(
+                                    color: Colors.grey.shade200,
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                ),
+                                Positioned(
+                                  left: (startPercent * width).clamp(0.0, width),
+                                  width: ((endPercent - startPercent) * width).clamp(0.0, width),
+                                  top: 10,
+                                  height: 40,
+                                  child: Container(
+                                    decoration: BoxDecoration(
+                                      color: storeColor.withValues(alpha: 0.3),
+                                      borderRadius: BorderRadius.circular(8),
+                                      border: Border.all(color: storeColor, width: 2),
+                                    ),
+                                  ),
+                                ),
+                                Positioned(
+                                  left: (startPercent * width - 15).clamp(-15.0, width - 15),
+                                  top: 0,
+                                  child: GestureDetector(
+                                    onHorizontalDragUpdate: (details) {
+                                      setState(() {
+                                        double newHour = _editingStartHour! + (details.delta.dx / width) * rangeHours;
+                                        newHour = _snapToQuarter(newHour);
+                                        final minStart = (_editingEndHour! - 12.0).clamp(0.0, 23.75);
+                                        newHour = newHour.clamp(minStart, _editingEndHour! - 0.25);
+                                        _editingStartHour = newHour;
+                                      });
+                                    },
+                                    child: Container(
+                                      width: 30,
+                                      height: 60,
+                                      decoration: BoxDecoration(color: storeColor, borderRadius: BorderRadius.circular(8)),
+                                      child: const Icon(Icons.chevron_left, color: Colors.white),
+                                    ),
+                                  ),
+                                ),
+                                Positioned(
+                                  left: (endPercent * width - 15).clamp(-15.0, width - 15),
+                                  top: 0,
+                                  child: GestureDetector(
+                                    onHorizontalDragUpdate: (details) {
+                                      setState(() {
+                                        double newHour = _editingEndHour! + (details.delta.dx / width) * rangeHours;
+                                        newHour = _snapToQuarter(newHour);
+                                        final maxEnd = (_editingStartHour! + 12.0).clamp(0.25, 36.0);
+                                        newHour = newHour.clamp(_editingStartHour! + 0.25, maxEnd);
+                                        _editingEndHour = newHour;
+                                      });
+                                    },
+                                    child: Container(
+                                      width: 30,
+                                      height: 60,
+                                      decoration: BoxDecoration(color: storeColor, borderRadius: BorderRadius.circular(8)),
+                                      child: const Icon(Icons.chevron_right, color: Colors.white),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      );
+                    },
+                  ),
+                  const SizedBox(height: 24),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton.icon(
+                      onPressed: () => _endTimelineEdit(save: true),
+                      icon: const Icon(Icons.check),
+                      label: const Text('確定'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: storeColor,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                       ),
                     ),
                   ),
-                ),
-              );
-            }),
-            // 当日のシフトバー（レーン分割）
-            CustomPaint(
-              size: Size(double.infinity, barHeight),
-              painter: _LargeTimelineBarPainter(
-                shifts: shiftsWithTime,
-                stores: stores,
-                laneCount: totalLaneCount,
-                laneOffset: carryoverShifts.length,
-                hasNextDayCard: hasNextDayCard,
+                ],
               ),
             ),
-            // 店舗ラベル（レーンごとに表示）
-            ...shiftsWithTime.asMap().entries.map((entry) {
-              final index = entry.key + carryoverShifts.length; // 継続シフト分オフセット
-              final shift = entry.value;
-              final store = stores.firstWhere(
-                (s) => s.id == shift.storeId,
-                orElse: () => stores.first,
-              );
-              final isWhiteStore = store.color == Colors.white;
-              final startParts = shift.startTime!.split(':');
-              final endParts = shift.endTime!.split(':');
-              final startHour = int.parse(startParts[0]) + int.parse(startParts[1]) / 60.0;
-              double endHour = int.parse(endParts[0]) + int.parse(endParts[1]) / 60.0;
-              final spansMidnight = endHour <= startHour;
-              if (spansMidnight) endHour = 24.0;
-
-              final startPercent = startHour / 24.0;
-              final endPercent = endHour / 24.0;
-              final widthPercent = endPercent - startPercent;
-
-              // レーンの位置を計算
-              final laneHeight = barHeight / totalLaneCount;
-              final laneTop = index * laneHeight;
-
-              // 翌日にまたがる場合のラベル
-              String labelText = store.name.length > 6 ? '${store.name.substring(0, 6)}...' : store.name;
-              if (spansMidnight && !hasNextDayCard) {
-                labelText = '$labelText →翌';
-              }
-
-              return Positioned(
-                left: startPercent * (MediaQuery.of(context).size.width - 48),
-                width: widthPercent * (MediaQuery.of(context).size.width - 48),
-                top: laneTop,
-                height: laneHeight,
-                child: Center(
-                  child: Text(
-                    labelText,
-                    style: TextStyle(
-                      color: isWhiteStore ? Colors.grey.shade700 : Colors.white,
-                      fontSize: 9,
-                      fontWeight: FontWeight.bold,
-                      shadows: isWhiteStore
-                          ? null
-                          : [
-                              Shadow(
-                                color: Colors.black.withValues(alpha: 0.5),
-                                blurRadius: 2,
-                              ),
-                            ],
-                    ),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-              );
-            }),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -3270,8 +3445,10 @@ class _TimeSettingListPageState extends ConsumerState<_TimeSettingListPage>
     final issues = _detectIssues(shiftDates, stores);
     final hasIssues = issues.isNotEmpty;
 
-    return Scaffold(
-      body: shiftDates.isEmpty
+    return Stack(
+      children: [
+        Scaffold(
+          body: shiftDates.isEmpty
           ? Center(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
@@ -4729,6 +4906,9 @@ class _MonthAccordionState extends State<_MonthAccordion>
             }),
         ],
       ),
+        ),
+        _buildTimelineEditOverlay(),
+      ],
     );
   }
 }
@@ -5034,170 +5214,6 @@ class _TimelineScalePainter extends CustomPainter {
   bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
 
-/// 大きなタイムラインバーを描画するPainter（Page 2用・レーン分割）
-class _LargeTimelineBarPainter extends CustomPainter {
-  final List<ShiftDate> shifts;
-  final List<Store> stores;
-  final int laneCount;
-  final int laneOffset; // 継続シフト分のオフセット
-  final bool hasNextDayCard; // 翌日のカードが存在するか
-
-  _LargeTimelineBarPainter({
-    required this.shifts,
-    required this.stores,
-    required this.laneCount,
-    this.laneOffset = 0,
-    this.hasNextDayCard = false,
-  });
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    if (shifts.isEmpty || laneCount == 0) return;
-
-    final laneHeight = size.height / laneCount;
-    final padding = 2.0;
-
-    // 各シフトをレーンごとに描画
-    for (int i = 0; i < shifts.length; i++) {
-      final shift = shifts[i];
-      if (!shift.hasTime) continue;
-
-      final startParts = shift.startTime!.split(':');
-      final endParts = shift.endTime!.split(':');
-      final startHour = int.parse(startParts[0]);
-      final startMinute = int.parse(startParts[1]);
-      final endHour = int.parse(endParts[0]);
-      final endMinute = int.parse(endParts[1]);
-
-      double startTime = startHour + startMinute / 60.0;
-      double endTime = endHour + endMinute / 60.0;
-
-      final spansMidnight = endTime <= startTime;
-      if (spansMidnight) {
-        endTime = 24.0;
-      }
-
-      final store = stores.firstWhere(
-        (s) => s.id == shift.storeId,
-        orElse: () => stores.first,
-      );
-      final Color barColor = store.color;
-      final bool isWhite = barColor == Colors.white;
-
-      final startX = (startTime / 24.0) * size.width;
-      final endX = (endTime / 24.0) * size.width;
-
-      // レーンの位置を計算（オフセット考慮）
-      final laneIndex = i + laneOffset;
-      final laneTop = laneIndex * laneHeight + padding;
-      final laneBottom = (laneIndex + 1) * laneHeight - padding;
-
-      final rect = RRect.fromRectAndRadius(
-        Rect.fromLTRB(startX, laneTop, endX, laneBottom),
-        const Radius.circular(4),
-      );
-
-      // メインのバーを描画
-      final paint = Paint()
-        ..color = isWhite ? Colors.white : barColor
-        ..style = PaintingStyle.fill;
-      canvas.drawRRect(rect, paint);
-
-      // 日またぎの場合、右端に斜線パターンを描画
-      if (spansMidnight) {
-        canvas.save();
-        canvas.clipRRect(rect);
-        final stripeWidth = 4.0;
-        final stripePaint = Paint()
-          ..color = (isWhite ? Colors.grey : Colors.black).withValues(alpha: 0.3)
-          ..strokeWidth = 2
-          ..style = PaintingStyle.stroke;
-
-        // 右端20pxに斜線を描画
-        final stripeAreaStart = endX - 20;
-        for (double x = stripeAreaStart; x < endX + 20; x += stripeWidth) {
-          canvas.drawLine(
-            Offset(x, laneTop),
-            Offset(x - 10, laneBottom),
-            stripePaint,
-          );
-        }
-        canvas.restore();
-      }
-
-      // 枠線
-      final borderPaint = Paint()
-        ..color = isWhite ? Colors.grey.shade400 : Colors.black.withValues(alpha: 0.3)
-        ..strokeWidth = 1
-        ..style = PaintingStyle.stroke;
-      canvas.drawRRect(rect, borderPaint);
-    }
-
-    // 重複部分を赤枠で表示
-    final overlaps = _detectOverlaps();
-    for (final overlap in overlaps) {
-      final startX = (overlap.start / 24.0) * size.width;
-      final endX = (overlap.end / 24.0) * size.width;
-
-      final overlapRect = RRect.fromRectAndRadius(
-        Rect.fromLTRB(startX, 0, endX, size.height),
-        const Radius.circular(4),
-      );
-
-      // 赤い枠線
-      final overlapBorderPaint = Paint()
-        ..color = Colors.red
-        ..strokeWidth = 2
-        ..style = PaintingStyle.stroke;
-      canvas.drawRRect(overlapRect, overlapBorderPaint);
-    }
-  }
-
-  // 重複している時間帯を検出
-  List<_TimeRange> _detectOverlaps() {
-    final List<_TimeRange> timeRanges = [];
-    final List<_TimeRange> overlaps = [];
-
-    for (final shift in shifts) {
-      if (!shift.hasTime) continue;
-
-      final startParts = shift.startTime!.split(':');
-      final endParts = shift.endTime!.split(':');
-      double startTime = int.parse(startParts[0]) + int.parse(startParts[1]) / 60.0;
-      double endTime = int.parse(endParts[0]) + int.parse(endParts[1]) / 60.0;
-
-      if (endTime <= startTime) {
-        endTime = 24.0;
-      }
-
-      timeRanges.add(_TimeRange(startTime, endTime, shift.storeId));
-    }
-
-    for (int i = 0; i < timeRanges.length; i++) {
-      for (int j = i + 1; j < timeRanges.length; j++) {
-        final a = timeRanges[i];
-        final b = timeRanges[j];
-
-        if (a.start < b.end && b.start < a.end) {
-          final overlapStart = a.start > b.start ? a.start : b.start;
-          final overlapEnd = a.end < b.end ? a.end : b.end;
-          overlaps.add(_TimeRange(overlapStart, overlapEnd, ''));
-        }
-      }
-    }
-
-    return overlaps;
-  }
-
-  @override
-  bool shouldRepaint(covariant _LargeTimelineBarPainter oldDelegate) {
-    return shifts != oldDelegate.shifts ||
-        stores != oldDelegate.stores ||
-        laneOffset != oldDelegate.laneOffset ||
-        hasNextDayCard != oldDelegate.hasNextDayCard;
-  }
-}
-
 // 時間範囲を表すヘルパークラス
 class _TimeRange {
   final double start;
@@ -5249,4 +5265,299 @@ class _ShiftIssue {
     required this.storeColor,
     this.overlapInfo,
   });
+}
+
+/// ドラッグ可能なシフトバーウィジェット
+class _DraggableShiftBar extends StatefulWidget {
+  final ShiftDate shift;
+  final Store store;
+  final double barHeight;
+  final double laneHeight;
+  final double laneTop;
+  final double containerWidth;
+  final bool hasNextDayCard;
+  final Function(String uniqueKey, String startTime, String endTime) onTimeChanged;
+  final VoidCallback? onEditRequest;
+
+  const _DraggableShiftBar({
+    super.key,
+    required this.shift,
+    required this.store,
+    required this.barHeight,
+    required this.laneHeight,
+    required this.laneTop,
+    required this.containerWidth,
+    required this.hasNextDayCard,
+    required this.onTimeChanged,
+    this.onEditRequest,
+  });
+
+  @override
+  State<_DraggableShiftBar> createState() => _DraggableShiftBarState();
+}
+
+class _DraggableShiftBarState extends State<_DraggableShiftBar> {
+  bool _isEditing = false;
+  double? _tempStartHour;
+  double? _tempEndHour;
+  String? _dragMode; // 'start', 'end', 'move'
+  double? _dragStartX;
+  double? _initialStartHour;
+  double? _initialEndHour;
+
+  double get _startHour {
+    if (_tempStartHour != null) return _tempStartHour!;
+    final parts = widget.shift.startTime!.split(':');
+    return int.parse(parts[0]) + int.parse(parts[1]) / 60.0;
+  }
+
+  double get _endHour {
+    if (_tempEndHour != null) return _tempEndHour!;
+    final parts = widget.shift.endTime!.split(':');
+    double end = int.parse(parts[0]) + int.parse(parts[1]) / 60.0;
+    // 日をまたぐ場合
+    if (end <= _startHour) end = 24.0;
+    return end;
+  }
+
+  bool get _spansMidnight {
+    final parts = widget.shift.endTime!.split(':');
+    double end = int.parse(parts[0]) + int.parse(parts[1]) / 60.0;
+    return end <= _startHour;
+  }
+
+  // 15分単位にスナップ
+  double _snapToQuarter(double hour) {
+    return (hour * 4).round() / 4.0;
+  }
+
+  // 時間を文字列に変換
+  String _hourToTimeString(double hour) {
+    // 24時間を超えた場合は翌日扱い
+    if (hour >= 24) hour -= 24;
+    final h = hour.floor();
+    final m = ((hour - h) * 60).round();
+    return '${h.toString().padLeft(2, '0')}:${m.toString().padLeft(2, '0')}';
+  }
+
+  void _onLongPressStart(LongPressStartDetails details) {
+    setState(() {
+      _isEditing = true;
+    });
+    // ハプティックフィードバック
+    HapticFeedback.mediumImpact();
+    // 編集モードのオーバーレイを表示
+    widget.onEditRequest?.call();
+  }
+
+  void _onPanStart(DragStartDetails details) {
+    if (!_isEditing) return;
+
+    final localX = details.localPosition.dx;
+    final barWidth = (_endHour - _startHour) / 24.0 * widget.containerWidth;
+
+    // ハンドルの範囲を判定（左端・右端の20pxをハンドルとする）
+    const handleWidth = 20.0;
+
+    if (localX < handleWidth) {
+      _dragMode = 'start';
+    } else if (localX > barWidth - handleWidth) {
+      _dragMode = 'end';
+    } else {
+      _dragMode = 'move';
+    }
+
+    _dragStartX = details.globalPosition.dx;
+    _initialStartHour = _startHour;
+    _initialEndHour = _endHour;
+  }
+
+  void _onPanUpdate(DragUpdateDetails details) {
+    if (!_isEditing || _dragMode == null) return;
+
+    final dx = details.globalPosition.dx - _dragStartX!;
+    final hourDelta = dx / widget.containerWidth * 24.0;
+
+    setState(() {
+      if (_dragMode == 'start') {
+        double newStart = _snapToQuarter(_initialStartHour! + hourDelta);
+        // 制約: 0以上、終了時間より前
+        newStart = newStart.clamp(0.0, (_tempEndHour ?? _initialEndHour!) - 0.25);
+        _tempStartHour = newStart;
+      } else if (_dragMode == 'end') {
+        double newEnd = _snapToQuarter(_initialEndHour! + hourDelta);
+        // 制約: 開始時間より後、24以下（または翌日まで）
+        newEnd = newEnd.clamp((_tempStartHour ?? _initialStartHour!) + 0.25, 28.0); // 翌日4時まで許容
+        _tempEndHour = newEnd;
+      } else if (_dragMode == 'move') {
+        final duration = _initialEndHour! - _initialStartHour!;
+        double newStart = _snapToQuarter(_initialStartHour! + hourDelta);
+        newStart = newStart.clamp(0.0, 24.0 - duration);
+        _tempStartHour = newStart;
+        _tempEndHour = newStart + duration;
+      }
+    });
+  }
+
+  void _onPanEnd(DragEndDetails details) {
+    if (!_isEditing || _dragMode == null) return;
+
+    // 時間を確定
+    final startTime = _hourToTimeString(_tempStartHour ?? _startHour);
+    double endHour = _tempEndHour ?? _endHour;
+    // 24時間を超える場合は翌日扱い
+    final endTime = _hourToTimeString(endHour > 24 ? endHour - 24 : endHour);
+
+    widget.onTimeChanged(widget.shift.uniqueKey, startTime, endTime);
+
+    setState(() {
+      _dragMode = null;
+      _dragStartX = null;
+      _initialStartHour = null;
+      _initialEndHour = null;
+      _tempStartHour = null;
+      _tempEndHour = null;
+    });
+  }
+
+  void _cancelEditing() {
+    setState(() {
+      _isEditing = false;
+      _tempStartHour = null;
+      _tempEndHour = null;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isWhiteStore = widget.store.color == Colors.white;
+    final storeColor = isWhiteStore ? Colors.grey.shade400 : widget.store.color;
+
+    final startPercent = _startHour / 24.0;
+    final endPercent = _endHour.clamp(0.0, 24.0) / 24.0;
+    final widthPercent = endPercent - startPercent;
+
+    final left = startPercent * widget.containerWidth;
+    final width = widthPercent * widget.containerWidth;
+
+    // 時間表示
+    final displayStartTime = _hourToTimeString(_startHour);
+    final displayEndHour = _endHour > 24 ? _endHour - 24 : _endHour;
+    final displayEndTime = _hourToTimeString(displayEndHour);
+
+    // ラベル
+    String labelText = widget.store.name.length > 6
+        ? '${widget.store.name.substring(0, 6)}...'
+        : widget.store.name;
+    if (_spansMidnight && !widget.hasNextDayCard && !_isEditing) {
+      labelText = '$labelText →翌';
+    }
+
+    return Positioned(
+      left: left,
+      width: width.clamp(30.0, widget.containerWidth - left),
+      top: widget.laneTop + 2,
+      height: widget.laneHeight - 4,
+      child: GestureDetector(
+        onLongPressStart: _onLongPressStart,
+        onPanStart: _onPanStart,
+        onPanUpdate: _onPanUpdate,
+        onPanEnd: _onPanEnd,
+        onTap: _isEditing ? _cancelEditing : null,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 100),
+          decoration: BoxDecoration(
+            color: storeColor.withValues(alpha: _isEditing ? 0.9 : 0.8),
+            borderRadius: BorderRadius.circular(4),
+            border: Border.all(
+              color: _isEditing ? Colors.white : storeColor,
+              width: _isEditing ? 2 : 1,
+            ),
+            boxShadow: _isEditing
+                ? [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.3),
+                      blurRadius: 4,
+                      offset: const Offset(0, 2),
+                    ),
+                  ]
+                : null,
+          ),
+          child: Stack(
+            children: [
+              // メインコンテンツ
+              Center(
+                child: _isEditing
+                    ? Text(
+                        '$displayStartTime - $displayEndTime',
+                        style: TextStyle(
+                          color: isWhiteStore ? Colors.grey.shade700 : Colors.white,
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      )
+                    : Text(
+                        labelText,
+                        style: TextStyle(
+                          color: isWhiteStore ? Colors.grey.shade700 : Colors.white,
+                          fontSize: 9,
+                          fontWeight: FontWeight.bold,
+                          shadows: isWhiteStore
+                              ? null
+                              : [
+                                  Shadow(
+                                    color: Colors.black.withValues(alpha: 0.5),
+                                    blurRadius: 2,
+                                  ),
+                                ],
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+              ),
+              // 左ハンドル（編集モード時）
+              if (_isEditing)
+                Positioned(
+                  left: 0,
+                  top: 0,
+                  bottom: 0,
+                  child: Container(
+                    width: 16,
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.3),
+                      borderRadius: const BorderRadius.only(
+                        topLeft: Radius.circular(4),
+                        bottomLeft: Radius.circular(4),
+                      ),
+                    ),
+                    child: const Center(
+                      child: Icon(Icons.drag_indicator, size: 12, color: Colors.white),
+                    ),
+                  ),
+                ),
+              // 右ハンドル（編集モード時）
+              if (_isEditing)
+                Positioned(
+                  right: 0,
+                  top: 0,
+                  bottom: 0,
+                  child: Container(
+                    width: 16,
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.3),
+                      borderRadius: const BorderRadius.only(
+                        topRight: Radius.circular(4),
+                        bottomRight: Radius.circular(4),
+                      ),
+                    ),
+                    child: const Center(
+                      child: Icon(Icons.drag_indicator, size: 12, color: Colors.white),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }
