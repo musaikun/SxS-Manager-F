@@ -1704,56 +1704,36 @@ class _DateSelectionPageState extends ConsumerState<_DateSelectionPage> {
     );
   }
 
-  // 指定週に全ての日付でシフトがある店舗リストを取得（ドット表示用）
-  List<Store> _getStoresWithShiftsForWeek(int week) {
+  // 指定週にシフトがある店舗リストを取得（店舗リストの順序でソート済み）
+  List<Store> _getStoresWithShiftsForWeekSorted(int week) {
     final shiftDates = ref.read(shiftDateProvider);
     final stores = ref.read(storeProvider);
-    final today = ShiftDateUtils.normalizeDate(DateTime.now());
+    final storeIds = <String>{};
 
-    // その週の有効な日付を取得
-    final dates = _getDatesInMonth((day) => ShiftDateUtils.getWeekOfMonth(day) == week);
-    final validDates = dates.where((d) => !d.isBefore(today)).toList();
-    if (validDates.isEmpty) return [];
-
-    // 各店舗について、全ての日付にシフトがあるかチェック
-    final result = <Store>[];
-    for (final store in stores) {
-      final allDatesHaveShift = validDates.every((date) =>
-          shiftDates.any((s) =>
-              ShiftDateUtils.normalizeDate(s.date) == date &&
-              s.storeId == store.id));
-      if (allDatesHaveShift) {
-        result.add(store);
+    for (final shift in shiftDates) {
+      if (ShiftDateUtils.getWeekOfMonth(shift.date) == week) {
+        storeIds.add(shift.storeId);
       }
     }
 
-    return result;
+    // 店舗リストの順序を維持してフィルタリング
+    return stores.where((s) => storeIds.contains(s.id)).toList();
   }
 
-  // 指定曜日に全ての日付でシフトがある店舗リストを取得（ドット表示用）
-  List<Store> _getStoresWithShiftsForWeekday(int weekday) {
+  // 指定曜日にシフトがある店舗リストを取得（店舗リストの順序でソート済み）
+  List<Store> _getStoresWithShiftsForWeekdaySorted(int weekday) {
     final shiftDates = ref.read(shiftDateProvider);
     final stores = ref.read(storeProvider);
-    final today = ShiftDateUtils.normalizeDate(DateTime.now());
+    final storeIds = <String>{};
 
-    // その曜日の有効な日付を取得
-    final dates = _getDatesInMonth((day) => day.weekday == weekday);
-    final validDates = dates.where((d) => !d.isBefore(today)).toList();
-    if (validDates.isEmpty) return [];
-
-    // 各店舗について、全ての日付にシフトがあるかチェック
-    final result = <Store>[];
-    for (final store in stores) {
-      final allDatesHaveShift = validDates.every((date) =>
-          shiftDates.any((s) =>
-              ShiftDateUtils.normalizeDate(s.date) == date &&
-              s.storeId == store.id));
-      if (allDatesHaveShift) {
-        result.add(store);
+    for (final shift in shiftDates) {
+      if (shift.date.weekday == weekday) {
+        storeIds.add(shift.storeId);
       }
     }
 
-    return result;
+    // 店舗リストの順序を維持してフィルタリング
+    return stores.where((s) => storeIds.contains(s.id)).toList();
   }
 
   // 指定曜日にシフトがある店舗リストを取得（店舗リストの順序でソート済み）
@@ -4293,21 +4273,6 @@ class _TimeSettingListPageState extends ConsumerState<_TimeSettingListPage>
     );
   }
 
-  // 指定曜日にシフトがある店舗リストを取得
-  List<Store> _getStoresWithShiftsForWeekday(int weekday) {
-    final shiftDates = ref.read(shiftDateProvider);
-    final stores = ref.read(storeProvider);
-    final storeIds = <String>{};
-
-    for (final shift in shiftDates) {
-      if (shift.date.weekday == weekday) {
-        storeIds.add(shift.storeId);
-      }
-    }
-
-    return stores.where((s) => storeIds.contains(s.id)).toList();
-  }
-
   Widget _buildWeekButton(String label, int week) {
     final isFullySelected = _isWeekOfMonthFullySelected(week);
     final hasWeek = _hasWeekOfMonth(week);
@@ -4373,21 +4338,6 @@ class _TimeSettingListPageState extends ConsumerState<_TimeSettingListPage>
         ),
       ),
     );
-  }
-
-  // 指定週にシフトがある店舗リストを取得
-  List<Store> _getStoresWithShiftsForWeek(int week) {
-    final shiftDates = ref.read(shiftDateProvider);
-    final stores = ref.read(storeProvider);
-    final storeIds = <String>{};
-
-    for (final shift in shiftDates) {
-      if (ShiftDateUtils.getWeekOfMonth(shift.date) == week) {
-        storeIds.add(shift.storeId);
-      }
-    }
-
-    return stores.where((s) => storeIds.contains(s.id)).toList();
   }
 
   // 指定週にシフトがある店舗リストを取得（店舗リストの順序でソート済み）
