@@ -3912,6 +3912,9 @@ class _TimeSettingListPageState extends ConsumerState<_TimeSettingListPage>
                 ),
               ],
             ),
+        ),
+        _buildTimelineEditOverlay(),
+      ],
     );
   }
 
@@ -4906,9 +4909,6 @@ class _MonthAccordionState extends State<_MonthAccordion>
             }),
         ],
       ),
-        ),
-        _buildTimelineEditOverlay(),
-      ],
     );
   }
 }
