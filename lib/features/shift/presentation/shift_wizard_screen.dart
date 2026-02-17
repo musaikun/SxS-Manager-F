@@ -1736,22 +1736,6 @@ class _DateSelectionPageState extends ConsumerState<_DateSelectionPage> {
     return stores.where((s) => storeIds.contains(s.id)).toList();
   }
 
-  // 指定曜日にシフトがある店舗リストを取得（店舗リストの順序でソート済み）
-  List<Store> _getStoresWithShiftsForWeekdaySorted(int weekday) {
-    final shiftDates = ref.read(shiftDateProvider);
-    final stores = ref.read(storeProvider);
-    final storeIds = <String>{};
-
-    for (final shift in shiftDates) {
-      if (shift.date.weekday == weekday) {
-        storeIds.add(shift.storeId);
-      }
-    }
-
-    // 店舗リストの順序を維持してフィルタリング
-    return stores.where((s) => storeIds.contains(s.id)).toList();
-  }
-
   // 店舗セレクター
   Widget _buildStoreSelector(List<Store> stores) {
     return Container(
@@ -4210,10 +4194,26 @@ class _TimeSettingListPageState extends ConsumerState<_TimeSettingListPage>
     );
   }
 
+  // 指定曜日にシフトがある店舗リストを取得（店舗リストの順序でソート済み）
+  List<Store> _getStoresWithShiftsForWeekdaySorted(int weekday) {
+    final shiftDates = ref.read(shiftDateProvider);
+    final stores = ref.read(storeProvider);
+    final storeIds = <String>{};
+
+    for (final shift in shiftDates) {
+      if (shift.date.weekday == weekday) {
+        storeIds.add(shift.storeId);
+      }
+    }
+
+    // 店舗リストの順序を維持してフィルタリング
+    return stores.where((s) => storeIds.contains(s.id)).toList();
+  }
+
   Widget _buildWeekdayButton(String label, int weekday, Color color) {
     final isFullySelected = _isWeekdayFullySelected(weekday);
     final hasWeekday = _hasWeekday(weekday);
-    final storesWithShifts = _getStoresWithShiftsForWeekday(weekday);
+    final storesWithShifts = _getStoresWithShiftsForWeekdaySorted(weekday);
 
     return Expanded(
       child: Padding(
