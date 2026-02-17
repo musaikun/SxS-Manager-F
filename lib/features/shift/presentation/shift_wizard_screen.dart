@@ -1606,10 +1606,20 @@ class _DateSelectionPageState extends ConsumerState<_DateSelectionPage> {
                               height: 6,
                               margin: const EdgeInsets.symmetric(horizontal: 1),
                               decoration: BoxDecoration(
-                                color: isWhite ? Colors.grey.shade400 : store.color,
+                                color: isWhite ? Colors.white : store.color,
                                 shape: BoxShape.circle,
-                                border: isWhite
-                                    ? Border.all(color: Colors.grey.shade500, width: 0.5)
+                                border: Border.all(
+                                  color: isWhite ? Colors.blue.shade400 : store.color.withValues(alpha: 0.3),
+                                  width: isWhite ? 1.0 : 0.5,
+                                ),
+                                boxShadow: isWhite
+                                    ? [
+                                        BoxShadow(
+                                          color: Colors.blue.shade200,
+                                          blurRadius: 2,
+                                          spreadRadius: 0.5,
+                                        ),
+                                      ]
                                     : null,
                               ),
                             );
@@ -1684,10 +1694,20 @@ class _DateSelectionPageState extends ConsumerState<_DateSelectionPage> {
                               height: 6,
                               margin: const EdgeInsets.symmetric(horizontal: 1),
                               decoration: BoxDecoration(
-                                color: isWhite ? Colors.grey.shade400 : store.color,
+                                color: isWhite ? Colors.white : store.color,
                                 shape: BoxShape.circle,
-                                border: isWhite
-                                    ? Border.all(color: Colors.grey.shade500, width: 0.5)
+                                border: Border.all(
+                                  color: isWhite ? Colors.blue.shade400 : store.color.withValues(alpha: 0.3),
+                                  width: isWhite ? 1.0 : 0.5,
+                                ),
+                                boxShadow: isWhite
+                                    ? [
+                                        BoxShadow(
+                                          color: Colors.blue.shade200,
+                                          blurRadius: 2,
+                                          spreadRadius: 0.5,
+                                        ),
+                                      ]
                                     : null,
                               ),
                             );
@@ -4257,10 +4277,20 @@ class _TimeSettingListPageState extends ConsumerState<_TimeSettingListPage>
                       height: 6,
                       margin: const EdgeInsets.symmetric(horizontal: 1),
                       decoration: BoxDecoration(
-                        color: isWhite ? Colors.grey.shade400 : store.color,
+                        color: isWhite ? Colors.white : store.color,
                         shape: BoxShape.circle,
-                        border: isWhite
-                            ? Border.all(color: Colors.grey.shade500, width: 0.5)
+                        border: Border.all(
+                          color: isWhite ? Colors.blue.shade400 : store.color.withValues(alpha: 0.3),
+                          width: isWhite ? 1.0 : 0.5,
+                        ),
+                        boxShadow: isWhite
+                            ? [
+                                BoxShadow(
+                                  color: Colors.blue.shade200,
+                                  blurRadius: 2,
+                                  spreadRadius: 0.5,
+                                ),
+                              ]
                             : null,
                       ),
                     );
@@ -4324,10 +4354,20 @@ class _TimeSettingListPageState extends ConsumerState<_TimeSettingListPage>
                       height: 6,
                       margin: const EdgeInsets.symmetric(horizontal: 1),
                       decoration: BoxDecoration(
-                        color: isWhite ? Colors.grey.shade400 : store.color,
+                        color: isWhite ? Colors.white : store.color,
                         shape: BoxShape.circle,
-                        border: isWhite
-                            ? Border.all(color: Colors.grey.shade500, width: 0.5)
+                        border: Border.all(
+                          color: isWhite ? Colors.blue.shade400 : store.color.withValues(alpha: 0.3),
+                          width: isWhite ? 1.0 : 0.5,
+                        ),
+                        boxShadow: isWhite
+                            ? [
+                                BoxShadow(
+                                  color: Colors.blue.shade200,
+                                  blurRadius: 2,
+                                  spreadRadius: 0.5,
+                                ),
+                              ]
                             : null,
                       ),
                     );
@@ -4426,10 +4466,20 @@ class _TimeSettingListPageState extends ConsumerState<_TimeSettingListPage>
                   height: 6,
                   margin: const EdgeInsets.symmetric(horizontal: 1),
                   decoration: BoxDecoration(
-                    color: isWhite ? Colors.grey.shade400 : store.color,
+                    color: isWhite ? Colors.white : store.color,
                     shape: BoxShape.circle,
-                    border: isWhite
-                        ? Border.all(color: Colors.grey.shade500, width: 0.5)
+                    border: Border.all(
+                      color: isWhite ? Colors.blue.shade400 : store.color.withValues(alpha: 0.3),
+                      width: isWhite ? 1.0 : 0.5,
+                    ),
+                    boxShadow: isWhite
+                        ? [
+                            BoxShadow(
+                              color: Colors.blue.shade200,
+                              blurRadius: 2,
+                              spreadRadius: 0.5,
+                            ),
+                          ]
                         : null,
                   ),
                 );
