@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../domain/models/time_preset.dart';
-import '../../providers/time_preset_provider.dart';
 
 /// 時間設定モーダルの結果
 class TimeSettingResult {
@@ -81,31 +79,8 @@ class _TimeSettingModalState extends ConsumerState<TimeSettingModal> {
     return TimeOfDay(hour: (minutes ~/ 60) % 24, minute: minutes % 60);
   }
 
-  // プリセット追加（名前入力なし、自動生成）
-  void _addCurrentTimeAsPreset() {
-    final currentStartTime = _minutesToTime(tempStartMinutes.round());
-    final currentEndTime = _minutesToTime(tempEndMinutes.round() % 1440);
-    final bool crossesMidnight = tempEndMinutes >= 1440;
-
-    final String label = crossesMidnight
-        ? '${currentStartTime.hour}:${currentStartTime.minute.toString().padLeft(2, '0')}-翌${currentEndTime.hour}:${currentEndTime.minute.toString().padLeft(2, '0')}'
-        : '${currentStartTime.hour}:${currentStartTime.minute.toString().padLeft(2, '0')}-${currentEndTime.hour}:${currentEndTime.minute.toString().padLeft(2, '0')}';
-
-    final preset = TimePreset(
-      label: label,
-      startHour: currentStartTime.hour,
-      startMinute: currentStartTime.minute,
-      endHour: currentEndTime.hour,
-      endMinute: currentEndTime.minute,
-      isNextDay: crossesMidnight,
-    );
-
-    ref.read(timePresetProvider.notifier).addPreset(preset);
-  }
-
   @override
   Widget build(BuildContext context) {
-    final presets = ref.watch(timePresetProvider);
     final currentStartTime = _minutesToTime(tempStartMinutes.round());
     final currentEndTime = _minutesToTime(tempEndMinutes.round() % 1440);
 
@@ -348,101 +323,6 @@ class _TimeSettingModalState extends ConsumerState<TimeSettingModal> {
               const SizedBox(height: 16),
             ],
 
-            // クイック設定
-            const Text(
-              'クイック設定（タップで時間を設定）',
-              style: TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: presets.map((preset) {
-                return Stack(
-                  clipBehavior: Clip.none,
-                  children: [
-                    OutlinedButton(
-                      onPressed: () {
-                        setState(() {
-                          tempStartMinutes = preset.startMinutes.toDouble();
-                          tempEndMinutes = preset.endMinutes.toDouble();
-                        });
-                      },
-                      style: OutlinedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 16, vertical: 10),
-                      ),
-                      child: Text(preset.label,
-                          style: const TextStyle(fontSize: 13)),
-                    ),
-                    Positioned(
-                      right: -6,
-                      top: -6,
-                      child: GestureDetector(
-                        onTap: () {
-                          ref
-                              .read(timePresetProvider.notifier)
-                              .removePreset(preset.label);
-                        },
-                        child: Container(
-                          padding: const EdgeInsets.all(4),
-                          decoration: const BoxDecoration(
-                            color: Colors.red,
-                            shape: BoxShape.circle,
-                          ),
-                          child: const Icon(
-                            Icons.close,
-                            size: 16,
-                            color: Colors.white,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                );
-              }).toList(),
-            ),
-            const SizedBox(height: 12),
-            // 現在の時間を追加ボタン（最大5個まで）
-            if (presets.length < 5)
-              SizedBox(
-                width: double.infinity,
-                child: OutlinedButton.icon(
-                  onPressed: _addCurrentTimeAsPreset,
-                  icon: const Icon(Icons.add, size: 18),
-                  label: const Text('現在の時間を追加'),
-                  style: OutlinedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                  ),
-                ),
-              ),
-            if (presets.length >= 5)
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: Colors.orange[50],
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.orange.shade200),
-                ),
-                child: Row(
-                  children: [
-                    Icon(Icons.info_outline, size: 16, color: Colors.orange[700]),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        'クイック設定は最大5個までです',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.orange[700],
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
           ],
         ),
       ),

@@ -411,12 +411,14 @@ class _DateSelectionScreenState extends ConsumerState<DateSelectionScreen> {
                                     height: 3,
                                     decoration: BoxDecoration(
                                       color: store.color == Colors.white
-                                        ? Colors.blue.withValues(alpha:0.8)
+                                        ? Colors.white
                                         : store.color,
                                       shape: BoxShape.circle,
                                       border: Border.all(
-                                        color: Colors.white.withValues(alpha:0.6),
-                                        width: 0.3,
+                                        color: store.color == Colors.white
+                                            ? Colors.blue.shade400
+                                            : Colors.white.withValues(alpha:0.6),
+                                        width: store.color == Colors.white ? 0.5 : 0.3,
                                       ),
                                     ),
                                   ),
@@ -466,10 +468,19 @@ class _DateSelectionScreenState extends ConsumerState<DateSelectionScreen> {
                                       shape: BoxShape.circle,
                                       border: Border.all(
                                         color: isWhite
-                                            ? Colors.blue.withValues(alpha:0.8)
+                                            ? Colors.blue.shade400
                                             : Colors.white.withValues(alpha:0.5),
                                         width: isWhite ? 1 : 0.5,
                                       ),
+                                      boxShadow: isWhite
+                                          ? [
+                                              BoxShadow(
+                                                color: Colors.blue.shade400.withValues(alpha: 0.5),
+                                                blurRadius: 2,
+                                                spreadRadius: 0.5,
+                                              ),
+                                            ]
+                                          : null,
                                     ),
                                   );
                                 }).toList(),
@@ -598,6 +609,15 @@ class _DateSelectionScreenState extends ConsumerState<DateSelectionScreen> {
                                           : dotColor.withValues(alpha:0.3),
                                       width: isWhite ? 1.0 : 0.8,
                                     ),
+                                    boxShadow: isWhite
+                                        ? [
+                                            BoxShadow(
+                                              color: Colors.blue.shade400.withValues(alpha: 0.5),
+                                              blurRadius: 2,
+                                              spreadRadius: 0.5,
+                                            ),
+                                          ]
+                                        : null,
                                   ),
                                 );
                               }).toList(),

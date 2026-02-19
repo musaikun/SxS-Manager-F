@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-import 'dart:convert';
 import '../providers/shift_date_provider.dart';
 import '../utils/time_utils.dart';
 import '../constants/shift_constants.dart';
@@ -19,47 +17,10 @@ class TimeSettingScreen extends ConsumerStatefulWidget {
   ConsumerState<TimeSettingScreen> createState() => _TimeSettingScreenState();
 }
 
-class QuickSetPreset {
-  final String label;
-  final int startHour;
-  final int startMinute;
-  final int endHour;
-  final int endMinute;
-  final bool crossesMidnight;
-
-  QuickSetPreset({
-    required this.label,
-    required this.startHour,
-    required this.startMinute,
-    required this.endHour,
-    required this.endMinute,
-    this.crossesMidnight = false,
-  });
-
-  Map<String, dynamic> toJson() => {
-        'label': label,
-        'startHour': startHour,
-        'startMinute': startMinute,
-        'endHour': endHour,
-        'endMinute': endMinute,
-        'crossesMidnight': crossesMidnight,
-      };
-
-  factory QuickSetPreset.fromJson(Map<String, dynamic> json) => QuickSetPreset(
-        label: json['label'],
-        startHour: json['startHour'],
-        startMinute: json['startMinute'],
-        endHour: json['endHour'],
-        endMinute: json['endMinute'],
-        crossesMidnight: json['crossesMidnight'] ?? false,
-      );
-}
-
 class _TimeSettingScreenState extends ConsumerState<TimeSettingScreen> {
   TimeOfDay? _startTime;
   TimeOfDay? _endTime;
   final TextEditingController _memoController = TextEditingController();
-  List<QuickSetPreset> _customPresets = [];
 
   @override
   void initState() {
@@ -67,129 +28,7 @@ class _TimeSettingScreenState extends ConsumerState<TimeSettingScreen> {
     // 既存のデータを読み込み
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _loadExistingData();
-      _loadCustomPresets();
     });
-  }
-
-  // カスタムプリセットを読み込み
-  Future<void> _loadCustomPresets() async {
-    final prefs = await SharedPreferences.getInstance();
-    final presetsJson = prefs.getString(ShiftConstants.customPresetsStorageKey);
-    if (presetsJson != null) {
-      final List<dynamic> decoded = jsonDecode(presetsJson);
-      setState(() {
-        _customPresets =
-            decoded.map((json) => QuickSetPreset.fromJson(json)).toList();
-      });
-    }
-  }
-
-  // カスタムプリセットを保存
-  Future<void> _saveCustomPresets() async {
-    final prefs = await SharedPreferences.getInstance();
-    final presetsJson =
-        jsonEncode(_customPresets.map((p) => p.toJson()).toList());
-    await prefs.setString(ShiftConstants.customPresetsStorageKey, presetsJson);
-  }
-
-  // カスタムプリセットを追加
-  Future<void> _addCustomPreset() async {
-    if (_startTime == null || _endTime == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('先に時間を設定してください')),
-      );
-      return;
-    }
-
-    final TextEditingController labelController = TextEditingController();
-    final result = await showDialog<String>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('プリセット名を入力'),
-        content: TextField(
-          controller: labelController,
-          decoration: const InputDecoration(
-            hintText: '例：早番、遅番、夜勤',
-            labelText: 'プリセット名',
-          ),
-          maxLength: 15,
-          autofocus: true,
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('キャンセル'),
-          ),
-          TextButton(
-            onPressed: () {
-              if (labelController.text.isNotEmpty) {
-                Navigator.pop(context, labelController.text);
-              }
-            },
-            child: const Text('追加'),
-          ),
-        ],
-      ),
-    );
-
-    if (result != null && result.isNotEmpty) {
-      // 日をまたぐかチェック
-      final startMinutes = _startTime!.hour * 60 + _startTime!.minute;
-      final endMinutes = _endTime!.hour * 60 + _endTime!.minute;
-      final crossesMidnight = endMinutes <= startMinutes;
-
-      setState(() {
-        _customPresets.add(QuickSetPreset(
-          label: result,
-          startHour: _startTime!.hour,
-          startMinute: _startTime!.minute,
-          endHour: _endTime!.hour,
-          endMinute: _endTime!.minute,
-          crossesMidnight: crossesMidnight,
-        ));
-      });
-      await _saveCustomPresets();
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('「$result」を追加しました')),
-        );
-      }
-    }
-  }
-
-  // カスタムプリセットを削除
-  Future<void> _deleteCustomPreset(int index) async {
-    final preset = _customPresets[index];
-    final result = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('プリセットを削除'),
-        content: Text('「${preset.label}」を削除しますか？'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('キャンセル'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(context, true),
-            style: TextButton.styleFrom(foregroundColor: Colors.red),
-            child: const Text('削除'),
-          ),
-        ],
-      ),
-    );
-
-    if (result == true) {
-      setState(() {
-        _customPresets.removeAt(index);
-      });
-      await _saveCustomPresets();
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('「${preset.label}」を削除しました')),
-        );
-      }
-    }
   }
 
   void _loadExistingData() {
@@ -503,111 +342,6 @@ class _TimeSettingScreenState extends ConsumerState<TimeSettingScreen> {
                     ],
                   ),
 
-                  const SizedBox(height: 16),
-
-                  // クイック設定
-                  const Text(
-                    'クイック設定',
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: [
-                      // デフォルトプリセット
-                      _buildDialogQuickSetButton(
-                        setDialogState,
-                        (start, end) {
-                          tempStartMinutes = TimeUtils.timeToMinutes(start).toDouble();
-                          tempEndMinutes = TimeUtils.timeToMinutes(end).toDouble();
-                        },
-                        '9:00-18:00',
-                        9,
-                        0,
-                        18,
-                        0,
-                      ),
-                      _buildDialogQuickSetButton(
-                        setDialogState,
-                        (start, end) {
-                          tempStartMinutes = TimeUtils.timeToMinutes(start).toDouble();
-                          tempEndMinutes = TimeUtils.timeToMinutes(end).toDouble();
-                        },
-                        '10:00-19:00',
-                        10,
-                        0,
-                        19,
-                        0,
-                      ),
-                      _buildDialogQuickSetButton(
-                        setDialogState,
-                        (start, end) {
-                          tempStartMinutes = TimeUtils.timeToMinutes(start).toDouble();
-                          tempEndMinutes = TimeUtils.timeToMinutes(end).toDouble();
-                        },
-                        '13:00-22:00',
-                        13,
-                        0,
-                        22,
-                        0,
-                      ),
-                      _buildDialogQuickSetButton(
-                        setDialogState,
-                        (start, end) {
-                          tempStartMinutes = TimeUtils.timeToMinutes(start).toDouble();
-                          tempEndMinutes = TimeUtils.timeToMinutes(end).toDouble();
-                        },
-                        '17:00-23:00',
-                        17,
-                        0,
-                        23,
-                        0,
-                      ),
-                      _buildDialogQuickSetButton(
-                        setDialogState,
-                        (start, end) {
-                          tempStartMinutes = TimeUtils.timeToMinutes(start).toDouble();
-                          // 深夜帯なので翌日扱い
-                          tempEndMinutes = (TimeUtils.timeToMinutes(end) + TimeUtils.minutesPerDay).toDouble();
-                        },
-                        '22:00-翌7:00',
-                        22,
-                        0,
-                        7,
-                        0,
-                      ),
-                      // カスタムプリセット
-                      ..._customPresets.map((preset) {
-                        return _buildDialogQuickSetButton(
-                          setDialogState,
-                          (start, end) {
-                            tempStartMinutes = TimeUtils.timeToMinutes(start).toDouble();
-                            if (preset.crossesMidnight) {
-                              tempEndMinutes = (TimeUtils.timeToMinutes(end) + TimeUtils.minutesPerDay).toDouble();
-                            } else {
-                              tempEndMinutes = TimeUtils.timeToMinutes(end).toDouble();
-                            }
-                          },
-                          preset.crossesMidnight
-                              ? '${preset.label}\n${preset.startHour}:${preset.startMinute.toString().padLeft(2, '0')}-翌${preset.endHour}:${preset.endMinute.toString().padLeft(2, '0')}'
-                              : '${preset.label}\n${preset.startHour}:${preset.startMinute.toString().padLeft(2, '0')}-${preset.endHour}:${preset.endMinute.toString().padLeft(2, '0')}',
-                          preset.startHour,
-                          preset.startMinute,
-                          preset.endHour,
-                          preset.endMinute,
-                          isCustom: true,
-                          onDelete: () async {
-                            Navigator.pop(context);
-                            await _deleteCustomPreset(_customPresets.indexOf(preset));
-                          },
-                        );
-                      }),
-                    ],
-                  ),
                 ],
               ),
             ),
@@ -630,81 +364,6 @@ class _TimeSettingScreenState extends ConsumerState<TimeSettingScreen> {
           );
         },
       ),
-    );
-  }
-
-  // ダイアログ用クイック設定ボタン
-  Widget _buildDialogQuickSetButton(
-    StateSetter setDialogState,
-    Function(TimeOfDay, TimeOfDay) onSet,
-    String label,
-    int startHour,
-    int startMinute,
-    int endHour,
-    int endMinute, {
-    bool isCustom = false,
-    VoidCallback? onDelete,
-  }) {
-    if (isCustom && onDelete != null) {
-      return Stack(
-        clipBehavior: Clip.none,
-        children: [
-          OutlinedButton(
-            onPressed: () {
-              setDialogState(() {
-                onSet(
-                  TimeOfDay(hour: startHour, minute: startMinute),
-                  TimeOfDay(hour: endHour, minute: endMinute),
-                );
-              });
-            },
-            style: OutlinedButton.styleFrom(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              foregroundColor: Colors.purple,
-              side: const BorderSide(color: Colors.purple),
-            ),
-            child: Text(
-              label,
-              style: const TextStyle(fontSize: 11),
-              textAlign: TextAlign.center,
-            ),
-          ),
-          Positioned(
-            right: -8,
-            top: -8,
-            child: GestureDetector(
-              onTap: onDelete,
-              child: Container(
-                padding: const EdgeInsets.all(2),
-                decoration: const BoxDecoration(
-                  color: Colors.red,
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(
-                  Icons.close,
-                  size: 14,
-                  color: Colors.white,
-                ),
-              ),
-            ),
-          ),
-        ],
-      );
-    }
-
-    return OutlinedButton(
-      onPressed: () {
-        setDialogState(() {
-          onSet(
-            TimeOfDay(hour: startHour, minute: startMinute),
-            TimeOfDay(hour: endHour, minute: endMinute),
-          );
-        });
-      },
-      style: OutlinedButton.styleFrom(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      ),
-      child: Text(label, style: const TextStyle(fontSize: 12)),
     );
   }
 
@@ -885,56 +544,6 @@ class _TimeSettingScreenState extends ConsumerState<TimeSettingScreen> {
 
             const SizedBox(height: 24),
 
-            // クイック設定ボタン
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Text(
-                  'クイック設定',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                OutlinedButton.icon(
-                  onPressed: _addCustomPreset,
-                  icon: const Icon(Icons.add, size: 16),
-                  label: const Text('追加', style: TextStyle(fontSize: 12)),
-                  style: OutlinedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                    foregroundColor: Colors.purple,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                // デフォルトプリセット
-                _buildQuickSetButton('9:00 - 18:00', 9, 0, 18, 0),
-                _buildQuickSetButton('10:00 - 19:00', 10, 0, 19, 0),
-                _buildQuickSetButton('13:00 - 22:00', 13, 0, 22, 0),
-                _buildQuickSetButton('17:00 - 23:00', 17, 0, 23, 0),
-                // カスタムプリセット
-                ..._customPresets.map((preset) {
-                  return _buildQuickSetButton(
-                    preset.crossesMidnight
-                        ? '${preset.label} (${preset.startHour}:${preset.startMinute.toString().padLeft(2, '0')}-翌${preset.endHour}:${preset.endMinute.toString().padLeft(2, '0')})'
-                        : '${preset.label} (${preset.startHour}:${preset.startMinute.toString().padLeft(2, '0')}-${preset.endHour}:${preset.endMinute.toString().padLeft(2, '0')})',
-                    preset.startHour,
-                    preset.startMinute,
-                    preset.endHour,
-                    preset.endMinute,
-                    isCustom: true,
-                  );
-                }),
-              ],
-            ),
-
-            const SizedBox(height: 24),
-
             // メモ
             const Text(
               'メモ',
@@ -995,29 +604,4 @@ class _TimeSettingScreenState extends ConsumerState<TimeSettingScreen> {
     );
   }
 
-  // クイック設定ボタン
-  Widget _buildQuickSetButton(
-    String label,
-    int startHour,
-    int startMinute,
-    int endHour,
-    int endMinute, {
-    bool isCustom = false,
-  }) {
-    return OutlinedButton(
-      onPressed: () {
-        setState(() {
-          _startTime = TimeOfDay(hour: startHour, minute: startMinute);
-          _endTime = TimeOfDay(hour: endHour, minute: endMinute);
-        });
-      },
-      style: isCustom
-          ? OutlinedButton.styleFrom(
-              foregroundColor: Colors.purple,
-              side: const BorderSide(color: Colors.purple),
-            )
-          : null,
-      child: Text(label),
-    );
-  }
 }
