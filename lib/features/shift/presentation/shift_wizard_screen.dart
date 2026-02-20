@@ -2223,6 +2223,23 @@ class _TimeSettingListPageState extends ConsumerState<_TimeSettingListPage>
   final ScrollController _scrollController = ScrollController();
   bool _isIssuesPanelExpanded = false; // 問題パネルの開閉状態
 
+  // スポットライト効果の状態管理
+  String? _spotlightShiftKey;
+
+  // スポットライトを開始
+  void _startSpotlight(String shiftKey) {
+    setState(() {
+      _spotlightShiftKey = shiftKey;
+    });
+  }
+
+  // スポットライトを終了
+  void _endSpotlight() {
+    setState(() {
+      _spotlightShiftKey = null;
+    });
+  }
+
   @override
   void initState() {
     super.initState();
@@ -2873,11 +2890,14 @@ class _TimeSettingListPageState extends ConsumerState<_TimeSettingListPage>
       builder: (context, constraints) {
         final containerWidth = constraints.maxWidth;
 
+        // スポットライトがアクティブかどうか
+        final isSpotlightActive = _spotlightShiftKey != null;
+
         return Container(
           width: double.infinity,
           height: barHeight,
           decoration: BoxDecoration(
-            color: Colors.grey.shade200,
+            color: isSpotlightActive ? Colors.grey.shade400 : Colors.grey.shade200,
             borderRadius: BorderRadius.circular(6),
           ),
           child: ClipRRect(
@@ -2888,7 +2908,7 @@ class _TimeSettingListPageState extends ConsumerState<_TimeSettingListPage>
                 // 時間目盛り（背景）
                 CustomPaint(
                   size: Size(double.infinity, barHeight),
-                  painter: _TimelineScalePainter(),
+                  painter: _TimelineScalePainter(isDimmed: isSpotlightActive),
                 ),
                 // シフトバー（ドラッグ可能）
                 ...shiftsWithTime.asMap().entries.map((entry) {
@@ -2918,6 +2938,10 @@ class _TimeSettingListPageState extends ConsumerState<_TimeSettingListPage>
                         endTime,
                       );
                     },
+                    isInSpotlight: _spotlightShiftKey == shift.uniqueKey,
+                    isSpotlightActive: _spotlightShiftKey != null,
+                    onSpotlightStart: () => _startSpotlight(shift.uniqueKey),
+                    onSpotlightEnd: _endSpotlight,
                   );
                 }),
               ],
@@ -4942,14 +4966,18 @@ class _StoreGroupAccordionState extends State<_StoreGroupAccordion>
 
 /// 時間目盛りを描画するPainter（Page 2の大きなタイムラインバー用）
 class _TimelineScalePainter extends CustomPainter {
+  final bool isDimmed;
+
+  _TimelineScalePainter({this.isDimmed = false});
+
   @override
   void paint(Canvas canvas, Size size) {
     final majorPaint = Paint()
-      ..color = Colors.grey.shade400
+      ..color = isDimmed ? Colors.grey.shade500 : Colors.grey.shade400
       ..strokeWidth = 1;
 
     final minorPaint = Paint()
-      ..color = Colors.grey.shade300
+      ..color = isDimmed ? Colors.grey.shade400 : Colors.grey.shade300
       ..strokeWidth = 0.5;
 
     final textPainter = TextPainter(
@@ -4973,7 +5001,7 @@ class _TimelineScalePainter extends CustomPainter {
         textPainter.text = TextSpan(
           text: '$hour',
           style: TextStyle(
-            color: Colors.grey.shade600,
+            color: isDimmed ? Colors.grey.shade700 : Colors.grey.shade600,
             fontSize: 8,
           ),
         );
@@ -4984,7 +5012,8 @@ class _TimelineScalePainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+  bool shouldRepaint(covariant _TimelineScalePainter oldDelegate) =>
+      isDimmed != oldDelegate.isDimmed;
 }
 
 // 問題の種類
@@ -5041,6 +5070,10 @@ class _DraggableShiftBar extends StatefulWidget {
   final double containerWidth;
   final bool hasNextDayCard;
   final Function(String uniqueKey, String startTime, String endTime) onTimeChanged;
+  final bool isInSpotlight;
+  final bool isSpotlightActive;
+  final VoidCallback? onSpotlightStart;
+  final VoidCallback? onSpotlightEnd;
 
   const _DraggableShiftBar({
     super.key,
@@ -5052,6 +5085,10 @@ class _DraggableShiftBar extends StatefulWidget {
     required this.containerWidth,
     required this.hasNextDayCard,
     required this.onTimeChanged,
+    this.isInSpotlight = false,
+    this.isSpotlightActive = false,
+    this.onSpotlightStart,
+    this.onSpotlightEnd,
   });
 
   @override
@@ -5178,6 +5215,16 @@ class _DraggableShiftBarState extends State<_DraggableShiftBar> {
       _tempStartHour = null;
       _tempEndHour = null;
     });
+    // スポットライト終了をコールバック
+    widget.onSpotlightEnd?.call();
+  }
+
+  void _startEditing() {
+    setState(() {
+      _isEditing = true;
+    });
+    // スポットライト開始をコールバック
+    widget.onSpotlightStart?.call();
   }
 
   @override
@@ -5205,6 +5252,9 @@ class _DraggableShiftBarState extends State<_DraggableShiftBar> {
       labelText = '$labelText →翌';
     }
 
+    // スポットライト効果: このバー以外が暗くなっている時、このバーは強調表示
+    final bool isDimmed = widget.isSpotlightActive && !widget.isInSpotlight;
+
     return Positioned(
       left: left,
       width: width.clamp(30.0, widget.containerWidth - left),
@@ -5215,21 +5265,24 @@ class _DraggableShiftBarState extends State<_DraggableShiftBar> {
         onPanUpdate: _onPanUpdate,
         onPanEnd: _onPanEnd,
         onTap: _isEditing ? _cancelEditing : null,
+        onLongPress: _isEditing ? null : _startEditing,
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 100),
           decoration: BoxDecoration(
-            color: storeColor.withValues(alpha: _isEditing ? 0.9 : 0.8),
+            color: isDimmed
+                ? storeColor.withValues(alpha: 0.3)
+                : storeColor.withValues(alpha: _isEditing ? 1.0 : 0.8),
             borderRadius: BorderRadius.circular(4),
             border: Border.all(
-              color: _isEditing ? Colors.white : storeColor,
+              color: _isEditing ? Colors.white : (isDimmed ? Colors.grey : storeColor),
               width: _isEditing ? 2 : 1,
             ),
             boxShadow: _isEditing
                 ? [
                     BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.3),
-                      blurRadius: 4,
-                      offset: const Offset(0, 2),
+                      color: Colors.black.withValues(alpha: 0.5),
+                      blurRadius: 8,
+                      offset: const Offset(0, 4),
                     ),
                   ]
                 : null,

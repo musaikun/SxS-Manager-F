@@ -94,11 +94,14 @@ class _TimeSettingModalState extends ConsumerState<TimeSettingModal> {
 
     return AlertDialog(
       title: Text(widget.title),
-      content: SingleChildScrollView(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
+      content: SizedBox(
+        width: 320, // モーダルの幅を固定
+        height: 420, // モーダルの高さを固定
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
             // 時間範囲の視覚表示
             Container(
               padding: const EdgeInsets.all(16),
@@ -324,6 +327,7 @@ class _TimeSettingModalState extends ConsumerState<TimeSettingModal> {
             ],
 
           ],
+        ),
         ),
       ),
       actions: [
